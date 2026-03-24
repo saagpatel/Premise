@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArgumentForm } from "@/components/debate/argument-form";
 import { ArgumentTree } from "@/components/debate/argument-tree";
 import { DebateHeader } from "@/components/debate/debate-header";
 import { useDebate } from "@/components/debate/debate-provider";
+import { ThreadView } from "@/components/debate/thread-view";
 import { ToastProvider } from "@/components/ui/toast";
 import { findCrux } from "@/lib/crux-finder";
 
@@ -19,8 +20,27 @@ export default function DebateRoom() {
 		participants,
 		arguments: args,
 		isParticipant,
+		connectionState,
 		refreshDebate,
 	} = useDebate();
+
+	// Default: tree on desktop, thread on mobile
+	const [viewMode, setViewMode] = useState<"tree" | "thread">("tree");
+
+	useEffect(() => {
+		const mq = window.matchMedia("(max-width: 768px)");
+		if (mq.matches) setViewMode("thread");
+
+		const handler = (e: MediaQueryListEvent) =>
+			setViewMode(e.matches ? "thread" : "tree");
+		mq.addEventListener("change", handler);
+		return () => mq.removeEventListener("change", handler);
+	}, []);
+
+	const toggleView = useCallback(
+		() => setViewMode((v) => (v === "tree" ? "thread" : "tree")),
+		[],
+	);
 
 	// Handle ?join=against (or ?join=for) query param
 	useEffect(() => {
@@ -31,7 +51,6 @@ export default function DebateRoom() {
 		joinAttempted.current = true;
 
 		(async () => {
-			// Ensure anon identity exists
 			await fetch("/api/auth/anon-id");
 
 			const res = await fetch(`/api/debates/${debate.id}/join`, {
@@ -44,7 +63,6 @@ export default function DebateRoom() {
 				await refreshDebate();
 			}
 
-			// Remove query param
 			router.replace(`/d/${debate.id}`);
 		})();
 	}, [searchParams, debate.id, refreshDebate, router]);
@@ -55,17 +73,27 @@ export default function DebateRoom() {
 	return (
 		<ToastProvider>
 			<div className="flex h-screen flex-col bg-gray-50">
-				<DebateHeader debate={debate} participants={participants} />
+				<DebateHeader
+					debate={debate}
+					participants={participants}
+					connectionState={connectionState}
+					viewMode={viewMode}
+					onToggleView={toggleView}
+				/>
 
 				<div className="flex flex-1 overflow-hidden">
-					{/* Tree panel */}
+					{/* Main panel — tree or thread */}
 					<div className="flex-1 overflow-hidden">
-						<ArgumentTree arguments={args} cruxId={cruxId} />
+						{viewMode === "tree" ? (
+							<ArgumentTree arguments={args} cruxId={cruxId} />
+						) : (
+							<ThreadView arguments={args} cruxId={cruxId} />
+						)}
 					</div>
 
 					{/* Form panel — only for participants */}
 					{isParticipant && (
-						<div className="w-[360px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-5">
+						<div className="hidden w-[360px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-5 md:block">
 							{hasOpponent ? (
 								<ArgumentForm
 									debateId={debate.id}

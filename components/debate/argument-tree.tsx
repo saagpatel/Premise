@@ -158,7 +158,8 @@ export function ArgumentTree({
 				svg.call(zoom.transform, initTransform);
 			}
 		});
-	}, [args.length]); // re-init zoom when argument count changes
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- zoom init only on mount
+	}, []); // zoom only on mount — React handles node re-rendering
 
 	const handleNodeClick = useCallback((arg: Argument, x: number, y: number) => {
 		setSelectedArg({ argument: arg, position: { x, y } });

@@ -1,7 +1,23 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState } from "react";
-import type { Argument, Debate, DebateSide, Participant } from "@/types";
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { createDebateChannel } from "@/lib/supabase/realtime";
+import type {
+	Argument,
+	ConnectionState,
+	Debate,
+	DebateSide,
+	Participant,
+	VoteValue,
+} from "@/types";
 
 interface DebateContextValue {
 	debate: Debate;
@@ -10,7 +26,10 @@ interface DebateContextValue {
 	currentUserId: string | null;
 	isParticipant: boolean;
 	userSide: DebateSide | null;
+	connectionState: ConnectionState;
+	userVotes: Set<string>;
 	refreshDebate: () => Promise<void>;
+	castVote: (argumentId: string, vote: VoteValue) => Promise<void>;
 }
 
 const DebateContext = createContext<DebateContextValue | null>(null);
@@ -19,6 +38,27 @@ export function useDebate(): DebateContextValue {
 	const ctx = useContext(DebateContext);
 	if (!ctx) throw new Error("useDebate must be used within DebateProvider");
 	return ctx;
+}
+
+function loadUserVotes(debateId: string): Set<string> {
+	try {
+		const raw = sessionStorage.getItem(`premise-votes-${debateId}`);
+		if (raw) return new Set(JSON.parse(raw) as string[]);
+	} catch {
+		// sessionStorage unavailable or corrupt
+	}
+	return new Set();
+}
+
+function saveUserVotes(debateId: string, votes: Set<string>) {
+	try {
+		sessionStorage.setItem(
+			`premise-votes-${debateId}`,
+			JSON.stringify(Array.from(votes)),
+		);
+	} catch {
+		// sessionStorage unavailable
+	}
 }
 
 export function DebateProvider({
@@ -37,9 +77,60 @@ export function DebateProvider({
 	const [debate, setDebate] = useState(initialDebate);
 	const [participants, setParticipants] = useState(initialParticipants);
 	const [args, setArgs] = useState(initialArguments);
+	const [connectionState, setConnectionState] =
+		useState<ConnectionState>("paused");
+	const [userVotes, setUserVotes] = useState<Set<string>>(() =>
+		loadUserVotes(initialDebate.id),
+	);
+
+	const argsRef = useRef(args);
+	argsRef.current = args;
 
 	const participant = participants.find((p) => p.userId === currentUserId);
 
+	// ── Realtime subscription ────────────────────────────────────────
+	useEffect(() => {
+		let supabase;
+		try {
+			supabase = createSupabaseBrowserClient();
+		} catch {
+			// No env vars — skip realtime
+			return;
+		}
+
+		const argIds = new Set(argsRef.current.map((a) => a.id));
+
+		const channel = createDebateChannel(debate.id, supabase, {
+			onArgument: (arg) => {
+				setArgs((prev) => {
+					if (prev.some((a) => a.id === arg.id)) return prev;
+					return [...prev, arg];
+				});
+			},
+			onVote: ({ argumentId, vote }) => {
+				// Only process votes for arguments in this debate
+				if (!argIds.has(argumentId)) return;
+
+				const delta = vote === "strong" ? 1 : -1;
+				setArgs((prev) =>
+					prev.map((a) =>
+						a.id === argumentId
+							? { ...a, netVoteScore: a.netVoteScore + delta }
+							: a,
+					),
+				);
+			},
+		});
+
+		channel.onStateChange(setConnectionState);
+		channel.subscribe();
+
+		return () => {
+			channel.unsubscribe();
+		};
+	}, [debate.id]);
+
+	// ── Refresh (full resync) ────────────────────────────────────────
 	const refreshDebate = useCallback(async () => {
 		try {
 			const res = await fetch(`/api/debates/${debate.id}`);
@@ -53,6 +144,68 @@ export function DebateProvider({
 		}
 	}, [debate.id]);
 
+	// ── Cast vote (optimistic) ───────────────────────────────────────
+	const castVote = useCallback(
+		async (argumentId: string, vote: VoteValue) => {
+			if (userVotes.has(argumentId)) return;
+
+			// Optimistic update
+			const delta = vote === "strong" ? 1 : -1;
+			const nextVotes = new Set(userVotes);
+			nextVotes.add(argumentId);
+			setUserVotes(nextVotes);
+			saveUserVotes(debate.id, nextVotes);
+
+			setArgs((prev) =>
+				prev.map((a) =>
+					a.id === argumentId
+						? { ...a, netVoteScore: a.netVoteScore + delta }
+						: a,
+				),
+			);
+
+			try {
+				const res = await fetch("/api/votes", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ argumentId, vote }),
+				});
+
+				if (!res.ok) {
+					// Revert optimistic update
+					const reverted = new Set(userVotes);
+					setUserVotes(reverted);
+					saveUserVotes(debate.id, reverted);
+
+					setArgs((prev) =>
+						prev.map((a) =>
+							a.id === argumentId
+								? {
+										...a,
+										netVoteScore: a.netVoteScore - delta,
+									}
+								: a,
+						),
+					);
+				}
+			} catch {
+				// Revert on network error
+				const reverted = new Set(userVotes);
+				setUserVotes(reverted);
+				saveUserVotes(debate.id, reverted);
+
+				setArgs((prev) =>
+					prev.map((a) =>
+						a.id === argumentId
+							? { ...a, netVoteScore: a.netVoteScore - delta }
+							: a,
+					),
+				);
+			}
+		},
+		[debate.id, userVotes],
+	);
+
 	return (
 		<DebateContext.Provider
 			value={{
@@ -62,7 +215,10 @@ export function DebateProvider({
 				currentUserId,
 				isParticipant: !!participant,
 				userSide: participant?.side ?? null,
+				connectionState,
+				userVotes,
 				refreshDebate,
+				castVote,
 			}}
 		>
 			{children}

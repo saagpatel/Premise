@@ -153,3 +153,12 @@ export interface CastVoteRequest {
 	argumentId: string;
 	vote: VoteValue;
 }
+
+// ── Realtime ─────────────────────────────────────────────────────────
+
+export type ConnectionState = "live" | "reconnecting" | "paused";
+
+export interface CastVoteResponse {
+	argumentId: string;
+	newScore: number;
+}

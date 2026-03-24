@@ -3,6 +3,8 @@
 import clsx from "clsx";
 import { useEffect, useRef } from "react";
 import type { Argument, ArgumentType } from "@/types";
+import { useDebate } from "./debate-provider";
+import { VotingControls } from "./voting-controls";
 
 const TYPE_COLORS: Record<ArgumentType, string> = {
 	evidence: "bg-violet-100 text-violet-800",
@@ -42,6 +44,7 @@ export function ArgumentNode({
 	onClose: () => void;
 }) {
 	const ref = useRef<HTMLDivElement>(null);
+	const { isParticipant, userVotes, castVote } = useDebate();
 
 	useEffect(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -107,11 +110,19 @@ export function ArgumentNode({
 				)}
 			</div>
 
-			<p className="mb-2 text-sm leading-relaxed text-gray-800">
+			<p className="mb-3 text-sm leading-relaxed text-gray-800">
 				{argument.contentText}
 			</p>
 
-			<div className="text-xs text-gray-400">
+			<VotingControls
+				argumentId={argument.id}
+				currentScore={argument.netVoteScore}
+				isParticipant={isParticipant}
+				hasVoted={userVotes.has(argument.id)}
+				onVote={(vote) => castVote(argument.id, vote)}
+			/>
+
+			<div className="mt-2 text-xs text-gray-400">
 				{formatTimestamp(argument.createdAt)}
 			</div>
 		</div>

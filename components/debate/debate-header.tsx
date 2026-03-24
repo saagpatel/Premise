@@ -2,7 +2,13 @@
 
 import clsx from "clsx";
 import { useState } from "react";
-import type { Debate, DebateStatus, Participant } from "@/types";
+import type {
+	ConnectionState,
+	Debate,
+	DebateStatus,
+	Participant,
+} from "@/types";
+import { LiveBadge } from "./live-badge";
 
 const STATUS_STYLES: Record<DebateStatus, string> = {
 	open: "bg-blue-100 text-blue-800",
@@ -86,9 +92,15 @@ function ParticipantSlot({
 export function DebateHeader({
 	debate,
 	participants,
+	connectionState,
+	viewMode,
+	onToggleView,
 }: {
 	debate: Debate;
 	participants: Participant[];
+	connectionState: ConnectionState;
+	viewMode: "tree" | "thread";
+	onToggleView: () => void;
 }) {
 	const forParticipant = participants.find((p) => p.side === "for");
 	const againstParticipant = participants.find((p) => p.side === "against");
@@ -97,14 +109,27 @@ export function DebateHeader({
 		<div className="w-full border-b border-gray-200 bg-white px-6 py-5">
 			<div className="mb-4 flex items-start justify-between gap-4">
 				<h1 className="text-2xl font-bold text-gray-900">{debate.claimText}</h1>
-				<span
-					className={clsx(
-						"shrink-0 rounded-full px-3 py-1 text-xs font-semibold",
-						STATUS_STYLES[debate.status],
-					)}
-				>
-					{STATUS_LABELS[debate.status]}
-				</span>
+				<div className="flex shrink-0 items-center gap-2">
+					<LiveBadge connectionState={connectionState} />
+					<span
+						className={clsx(
+							"rounded-full px-3 py-1 text-xs font-semibold",
+							STATUS_STYLES[debate.status],
+						)}
+					>
+						{STATUS_LABELS[debate.status]}
+					</span>
+					<button
+						onClick={onToggleView}
+						className={clsx(
+							"rounded-lg px-3 py-1 text-xs font-medium transition-colors md:hidden",
+							"border border-gray-300 bg-white hover:bg-gray-50",
+							"focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
+						)}
+					>
+						{viewMode === "tree" ? "Thread" : "Tree"}
+					</button>
+				</div>
 			</div>
 			<div className="flex gap-4">
 				<ParticipantSlot
