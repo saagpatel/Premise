@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+	.crux-pulse {
+		animation: crux-pulse 2s ease-in-out infinite;
+	}
+}
+
+@keyframes crux-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.6;
+	}
+}
