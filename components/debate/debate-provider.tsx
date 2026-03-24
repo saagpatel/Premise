@@ -30,6 +30,8 @@ interface DebateContextValue {
 	userVotes: Set<string>;
 	refreshDebate: () => Promise<void>;
 	castVote: (argumentId: string, vote: VoteValue) => Promise<void>;
+	proposeConclusion: () => Promise<void>;
+	respondToConclusion: (action: "accept" | "decline") => Promise<void>;
 }
 
 const DebateContext = createContext<DebateContextValue | null>(null);
@@ -144,6 +146,40 @@ export function DebateProvider({
 		}
 	}, [debate.id]);
 
+	// ── Conclusion flow ──────────────────────────────────────────────
+	const proposeConclusion = useCallback(async () => {
+		try {
+			const res = await fetch(`/api/debates/${debate.id}/conclusion`, {
+				method: "POST",
+			});
+			if (res.ok) {
+				const data = await res.json();
+				setDebate(data.debate);
+			}
+		} catch {
+			// silently fail
+		}
+	}, [debate.id]);
+
+	const respondToConclusion = useCallback(
+		async (action: "accept" | "decline") => {
+			try {
+				const res = await fetch(`/api/debates/${debate.id}/conclusion`, {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ action }),
+				});
+				if (res.ok) {
+					const data = await res.json();
+					setDebate(data.debate);
+				}
+			} catch {
+				// silently fail
+			}
+		},
+		[debate.id],
+	);
+
 	// ── Cast vote (optimistic) ───────────────────────────────────────
 	const castVote = useCallback(
 		async (argumentId: string, vote: VoteValue) => {
@@ -219,6 +255,8 @@ export function DebateProvider({
 				userVotes,
 				refreshDebate,
 				castVote,
+				proposeConclusion,
+				respondToConclusion,
 			}}
 		>
 			{children}

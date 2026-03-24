@@ -8,6 +8,7 @@ import type {
 	DebateStatus,
 	Participant,
 } from "@/types";
+import { useDebate } from "./debate-provider";
 import { LiveBadge } from "./live-badge";
 
 const STATUS_STYLES: Record<DebateStatus, string> = {
@@ -102,8 +103,40 @@ export function DebateHeader({
 	viewMode: "tree" | "thread";
 	onToggleView: () => void;
 }) {
+	const {
+		isParticipant,
+		currentUserId,
+		proposeConclusion,
+		respondToConclusion,
+	} = useDebate();
+	const [shareCopied, setShareCopied] = useState(false);
+	const [conclusionLoading, setConclusionLoading] = useState(false);
+
 	const forParticipant = participants.find((p) => p.side === "for");
 	const againstParticipant = participants.find((p) => p.side === "against");
+
+	const isProposer = debate.conclusionProposedBy === currentUserId;
+	const isOpponentOfProposer =
+		isParticipant && debate.status === "concluding" && !isProposer;
+
+	const handleShare = async () => {
+		const url = `${window.location.origin}/debate/${debate.id}`;
+		await navigator.clipboard.writeText(url);
+		setShareCopied(true);
+		setTimeout(() => setShareCopied(false), 2000);
+	};
+
+	const handleProposeConclusion = async () => {
+		setConclusionLoading(true);
+		await proposeConclusion();
+		setConclusionLoading(false);
+	};
+
+	const handleRespond = async (action: "accept" | "decline") => {
+		setConclusionLoading(true);
+		await respondToConclusion(action);
+		setConclusionLoading(false);
+	};
 
 	return (
 		<div className="w-full border-b border-gray-200 bg-white px-6 py-5">
@@ -119,6 +152,38 @@ export function DebateHeader({
 					>
 						{STATUS_LABELS[debate.status]}
 					</span>
+					{/* Share button */}
+					<button
+						onClick={handleShare}
+						className={clsx(
+							"rounded-lg px-3 py-1 text-xs font-medium transition-colors",
+							"border border-gray-300 bg-white hover:bg-gray-50",
+							"focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
+						)}
+					>
+						{shareCopied ? "Copied!" : "Share"}
+					</button>
+					{/* Propose conclusion button */}
+					{isParticipant && debate.status === "in_progress" && (
+						<button
+							onClick={handleProposeConclusion}
+							disabled={conclusionLoading}
+							className={clsx(
+								"rounded-lg px-3 py-1 text-xs font-medium transition-colors",
+								"border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100",
+								"focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1",
+								"disabled:cursor-not-allowed disabled:opacity-50",
+							)}
+						>
+							Propose Conclusion
+						</button>
+					)}
+					{/* Conclusion proposed indicator for proposer */}
+					{isParticipant && debate.status === "concluding" && isProposer && (
+						<span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-700">
+							Awaiting opponent...
+						</span>
+					)}
 					<button
 						onClick={onToggleView}
 						className={clsx(
@@ -131,6 +196,40 @@ export function DebateHeader({
 					</button>
 				</div>
 			</div>
+			{/* Conclusion response banner for opponent */}
+			{isOpponentOfProposer && (
+				<div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+					<p className="text-sm text-amber-800">
+						Your opponent has proposed ending this debate.
+					</p>
+					<div className="flex gap-2">
+						<button
+							onClick={() => handleRespond("accept")}
+							disabled={conclusionLoading}
+							className={clsx(
+								"rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+								"bg-green-600 text-white hover:bg-green-700",
+								"focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1",
+								"disabled:cursor-not-allowed disabled:opacity-50",
+							)}
+						>
+							Accept
+						</button>
+						<button
+							onClick={() => handleRespond("decline")}
+							disabled={conclusionLoading}
+							className={clsx(
+								"rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+								"border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+								"focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1",
+								"disabled:cursor-not-allowed disabled:opacity-50",
+							)}
+						>
+							Decline
+						</button>
+					</div>
+				</div>
+			)}
 			<div className="flex gap-4">
 				<ParticipantSlot
 					participant={forParticipant}
