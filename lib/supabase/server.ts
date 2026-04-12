@@ -5,10 +5,10 @@ import { cookies } from "next/headers";
 /**
  * Server-side Supabase client using the anon key.
  * Respects RLS — use for reading public data in server components and route handlers.
- * In Next.js 14, cookies() is synchronous.
+ * In Next.js 15, cookies() is async.
  */
-export function createServerSupabaseClient() {
-	const cookieStore = cookies();
+export async function createServerSupabaseClient() {
+	const cookieStore = await cookies();
 
 	const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 	const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

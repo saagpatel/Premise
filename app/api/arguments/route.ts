@@ -14,7 +14,7 @@ const VALID_ARGUMENT_TYPES: ArgumentType[] = [
 ];
 
 export async function POST(request: Request) {
-	const anonId = getAnonId();
+	const anonId = await getAnonId();
 	if (!anonId) {
 		return NextResponse.json(
 			{ error: "Anonymous identity required" },

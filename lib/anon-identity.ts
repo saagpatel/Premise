@@ -4,8 +4,8 @@ import { cookies } from "next/headers";
 const COOKIE_NAME = "premise-anon-id";
 
 /** Read the premise-anon-id cookie value, or null if not set. */
-export function getAnonId(): string | null {
-	const cookieStore = cookies();
+export async function getAnonId(): Promise<string | null> {
+	const cookieStore = await cookies();
 	return cookieStore.get(COOKIE_NAME)?.value ?? null;
 }
 
@@ -13,7 +13,7 @@ export function getAnonId(): string | null {
 export async function resolveUserId(
 	supabase: SupabaseClient,
 ): Promise<string | null> {
-	const anonId = getAnonId();
+	const anonId = await getAnonId();
 	if (!anonId) return null;
 
 	const { data } = await supabase

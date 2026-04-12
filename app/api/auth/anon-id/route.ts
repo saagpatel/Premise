@@ -11,7 +11,7 @@ const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30;
  * If no cookie exists, generates a new UUID, creates a users row, and sets the cookie.
  */
 export async function GET() {
-	const cookieStore = cookies();
+	const cookieStore = await cookies();
 	const existing = cookieStore.get(COOKIE_NAME);
 
 	if (existing?.value) {
@@ -50,7 +50,7 @@ export async function GET() {
  * Body: { authId: string }
  */
 export async function POST(request: Request) {
-	const cookieStore = cookies();
+	const cookieStore = await cookies();
 	const existing = cookieStore.get(COOKIE_NAME);
 
 	if (!existing?.value) {

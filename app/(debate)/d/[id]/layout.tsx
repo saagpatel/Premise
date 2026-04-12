@@ -66,7 +66,7 @@ export default async function DebateLayout({
 	const debateId = params.id;
 
 	// Resolve current user from anon cookie
-	const cookieStore = cookies();
+	const cookieStore = await cookies();
 	const anonCookie = cookieStore.get("premise-anon-id");
 	let currentUserId: string | null = null;
 

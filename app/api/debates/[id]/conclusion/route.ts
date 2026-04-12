@@ -10,7 +10,7 @@ export async function POST(
 	_request: Request,
 	{ params }: { params: { id: string } },
 ) {
-	const anonId = getAnonId();
+	const anonId = await getAnonId();
 	if (!anonId) {
 		return NextResponse.json(
 			{ error: "Authentication required" },
@@ -105,7 +105,7 @@ export async function PATCH(
 	request: Request,
 	{ params }: { params: { id: string } },
 ) {
-	const anonId = getAnonId();
+	const anonId = await getAnonId();
 	if (!anonId) {
 		return NextResponse.json(
 			{ error: "Authentication required" },
