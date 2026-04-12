@@ -1,8 +1,8 @@
 "use client";
 
 import clsx from "clsx";
-import { useEffect, useRef } from "react";
-import type { Argument, ArgumentType } from "@/types";
+import { useEffect, useRef, useState } from "react";
+import type { Argument, ArgumentType, FlagReason } from "@/types";
 import { useDebate } from "./debate-provider";
 import { VotingControls } from "./voting-controls";
 
@@ -16,6 +16,14 @@ const TYPE_COLORS: Record<ArgumentType, string> = {
 	clarification: "bg-gray-100 text-gray-800",
 };
 
+const FLAG_REASONS: { value: FlagReason; label: string }[] = [
+	{ value: "bad_faith", label: "Bad faith" },
+	{ value: "personal_attack", label: "Personal attack" },
+	{ value: "off_topic", label: "Off topic" },
+	{ value: "spam", label: "Spam" },
+	{ value: "other", label: "Other" },
+];
+
 function formatTimestamp(iso: string): string {
 	const date = new Date(iso);
 	const now = new Date();
@@ -28,6 +36,108 @@ function formatTimestamp(iso: string): string {
 	if (diffHrs < 24) return `${diffHrs}h ago`;
 	const diffDays = Math.floor(diffHrs / 24);
 	return `${diffDays}d ago`;
+}
+
+type FlagStatus =
+	| "idle"
+	| "submitting"
+	| "flagged"
+	| "already_flagged"
+	| "own_argument";
+
+function FlagPopover({
+	argumentId,
+	onClose,
+}: {
+	argumentId: string;
+	onClose: () => void;
+}) {
+	const [reason, setReason] = useState<FlagReason>("bad_faith");
+	const [status, setStatus] = useState<FlagStatus>("idle");
+
+	async function handleSubmit() {
+		setStatus("submitting");
+		try {
+			const res = await fetch("/api/flags", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ argumentId, reason }),
+			});
+
+			if (res.ok) {
+				setStatus("flagged");
+				setTimeout(onClose, 1200);
+				return;
+			}
+
+			if (res.status === 409) {
+				setStatus("already_flagged");
+				return;
+			}
+
+			if (res.status === 403) {
+				setStatus("own_argument");
+				return;
+			}
+
+			// Other errors: reset to idle so user can retry
+			setStatus("idle");
+		} catch {
+			setStatus("idle");
+		}
+	}
+
+	const feedbackMessage =
+		status === "flagged"
+			? "Flagged"
+			: status === "already_flagged"
+				? "Already flagged"
+				: status === "own_argument"
+					? "Cannot flag your own argument"
+					: null;
+
+	return (
+		<div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3 shadow-sm">
+			{feedbackMessage !== null ? (
+				<p
+					className={clsx(
+						"text-xs font-medium",
+						status === "flagged" ? "text-green-600" : "text-amber-600",
+					)}
+				>
+					{feedbackMessage}
+				</p>
+			) : (
+				<>
+					<select
+						value={reason}
+						onChange={(e) => setReason(e.target.value as FlagReason)}
+						disabled={status === "submitting"}
+						className="mb-2 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+					>
+						{FLAG_REASONS.map((r) => (
+							<option key={r.value} value={r.value}>
+								{r.label}
+							</option>
+						))}
+					</select>
+					<button
+						onClick={() => void handleSubmit()}
+						disabled={status === "submitting"}
+						className={clsx(
+							"w-full rounded px-3 py-1.5 text-xs font-medium transition-colors",
+							"focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1",
+							status === "submitting"
+								? "cursor-not-allowed bg-gray-200 text-gray-400"
+								: "bg-red-50 text-red-700 hover:bg-red-100",
+						)}
+					>
+						{status === "submitting" ? "Submitting…" : "Submit Flag"}
+					</button>
+				</>
+			)}
+		</div>
+	);
 }
 
 export function ArgumentNode({
@@ -45,6 +155,7 @@ export function ArgumentNode({
 }) {
 	const ref = useRef<HTMLDivElement>(null);
 	const { isParticipant, userVotes, castVote } = useDebate();
+	const [flagOpen, setFlagOpen] = useState(false);
 
 	useEffect(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -122,9 +233,30 @@ export function ArgumentNode({
 				onVote={(vote) => castVote(argument.id, vote)}
 			/>
 
-			<div className="mt-2 text-xs text-gray-400">
-				{formatTimestamp(argument.createdAt)}
+			<div className="mt-2 flex items-center justify-between">
+				<button
+					onClick={() => setFlagOpen((prev) => !prev)}
+					aria-label="Flag argument"
+					aria-expanded={flagOpen}
+					className={clsx(
+						"rounded p-1 text-base leading-none transition-colors",
+						"focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1",
+						flagOpen ? "text-red-500" : "text-gray-300 hover:text-gray-500",
+					)}
+				>
+					⚑
+				</button>
+				<span className="text-xs text-gray-400">
+					{formatTimestamp(argument.createdAt)}
+				</span>
 			</div>
+
+			{flagOpen && (
+				<FlagPopover
+					argumentId={argument.id}
+					onClose={() => setFlagOpen(false)}
+				/>
+			)}
 		</div>
 	);
 }
