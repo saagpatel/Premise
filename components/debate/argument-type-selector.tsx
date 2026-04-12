@@ -60,9 +60,11 @@ const ARGUMENT_TYPES: TypeInfo[] = [
 export function ArgumentTypeSelector({
 	selected,
 	onSelect,
+	aiSuggestedType = null,
 }: {
 	selected: ArgumentType | null;
 	onSelect: (type: ArgumentType | null) => void;
+	aiSuggestedType?: ArgumentType | null;
 }) {
 	return (
 		<div className="grid grid-cols-2 gap-3">
@@ -84,7 +86,14 @@ export function ArgumentTypeSelector({
 							"col-span-2",
 					)}
 				>
-					<div className="font-semibold text-gray-900">{info.label}</div>
+					<div className="flex items-center gap-2">
+						<span className="font-semibold text-gray-900">{info.label}</span>
+						{selected === info.type && aiSuggestedType === info.type && (
+							<span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700">
+								AI suggested
+							</span>
+						)}
+					</div>
 					<div className="mt-1 text-sm text-gray-600">{info.description}</div>
 					<div className="mt-1 text-sm italic text-gray-400">
 						{info.example}

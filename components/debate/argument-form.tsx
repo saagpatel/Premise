@@ -1,9 +1,9 @@
 "use client";
 
 import clsx from "clsx";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import type { Argument, ArgumentType } from "@/types";
+import type { Argument, ArgumentType, ClassifyResponse } from "@/types";
 import { ArgumentTypeSelector } from "./argument-type-selector";
 
 function getCharCountColor(count: number): string {
@@ -56,6 +56,11 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 	);
 }
 
+interface AiSuggestion {
+	suggestedType: ArgumentType | null;
+	confidence: number;
+}
+
 export function ArgumentForm({
 	debateId,
 	arguments: existingArgs,
@@ -72,7 +77,85 @@ export function ArgumentForm({
 	const [argumentType, setArgumentType] = useState<ArgumentType | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
+	// AI classification state
+	const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+	const [isClassifying, setIsClassifying] = useState(false);
+	const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const abortControllerRef = useRef<AbortController | null>(null);
+
 	const argsById = new Map(existingArgs.map((a) => [a.id, a]));
+
+	// Cleanup on unmount
+	useEffect(() => {
+		return () => {
+			if (debounceTimerRef.current !== null) {
+				clearTimeout(debounceTimerRef.current);
+			}
+			abortControllerRef.current?.abort();
+		};
+	}, []);
+
+	function handleContentChange(value: string) {
+		setContentText(value);
+
+		// Cancel previous debounce + in-flight request
+		if (debounceTimerRef.current !== null) {
+			clearTimeout(debounceTimerRef.current);
+		}
+		abortControllerRef.current?.abort();
+
+		if (value.length < 50) {
+			setAiSuggestion(null);
+			setIsClassifying(false);
+			return;
+		}
+
+		debounceTimerRef.current = setTimeout(() => {
+			void classifyArgument(value);
+		}, 1000);
+	}
+
+	async function classifyArgument(text: string) {
+		abortControllerRef.current = new AbortController();
+		setIsClassifying(true);
+
+		try {
+			const res = await fetch("/api/classify-argument", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ contentText: text }),
+				signal: abortControllerRef.current.signal,
+			});
+
+			if (!res.ok) {
+				setAiSuggestion(null);
+				return;
+			}
+
+			const data: ClassifyResponse = (await res.json()) as ClassifyResponse;
+			setAiSuggestion(
+				data.suggestedType !== null
+					? { suggestedType: data.suggestedType, confidence: data.confidence }
+					: null,
+			);
+		} catch (err) {
+			if (err instanceof DOMException && err.name === "AbortError") {
+				// cancelled — not an error
+				return;
+			}
+			// Non-abort errors: silently clear (classifier is optional)
+			setAiSuggestion(null);
+		} finally {
+			setIsClassifying(false);
+		}
+	}
+
+	// When AI suggestion arrives and no type is manually selected yet, pre-select it
+	useEffect(() => {
+		if (aiSuggestion?.suggestedType && argumentType === null) {
+			setArgumentType(aiSuggestion.suggestedType);
+		}
+	}, [aiSuggestion, argumentType]);
 
 	const handleSubmit = async () => {
 		if (!argumentType || contentText.trim().length < 10) return;
@@ -91,11 +174,15 @@ export function ArgumentForm({
 			});
 
 			if (!res.ok) {
-				const data = await res.json();
-				toast({
-					message: data.error ?? "Failed to post argument",
-					type: "error",
-				});
+				const data: unknown = await res.json();
+				const message =
+					data !== null &&
+					typeof data === "object" &&
+					"error" in data &&
+					typeof (data as Record<string, unknown>).error === "string"
+						? (data as Record<string, unknown>).error
+						: "Failed to post argument";
+				toast({ message: message as string, type: "error" });
 				return;
 			}
 
@@ -103,6 +190,7 @@ export function ArgumentForm({
 			setContentText("");
 			setParentArgumentId(null);
 			setArgumentType(null);
+			setAiSuggestion(null);
 			setStep(1);
 			onArgumentPosted();
 		} catch {
@@ -121,13 +209,40 @@ export function ArgumentForm({
 				<div className="flex flex-1 flex-col">
 					<textarea
 						value={contentText}
-						onChange={(e) => setContentText(e.target.value)}
+						onChange={(e) => handleContentChange(e.target.value)}
 						maxLength={500}
 						rows={5}
 						placeholder="Write your argument..."
 						className="flex-1 resize-none rounded-lg border border-gray-300 p-3 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 					/>
-					<div className="mt-2 flex items-center justify-between">
+					<div className="mt-1 min-h-[20px]">
+						{isClassifying && (
+							<span className="flex items-center gap-1.5 text-xs text-gray-400">
+								<svg
+									className="h-3 w-3 animate-spin"
+									viewBox="0 0 24 24"
+									fill="none"
+								>
+									<circle
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										strokeWidth="4"
+										className="opacity-25"
+									/>
+									<path
+										d="M4 12a8 8 0 018-8"
+										stroke="currentColor"
+										strokeWidth="4"
+										className="opacity-75"
+									/>
+								</svg>
+								Classifying…
+							</span>
+						)}
+					</div>
+					<div className="mt-1 flex items-center justify-between">
 						<span
 							className={clsx("text-xs", getCharCountColor(contentText.length))}
 						>
@@ -239,7 +354,14 @@ export function ArgumentForm({
 					<div className="flex-1 overflow-y-auto">
 						<ArgumentTypeSelector
 							selected={argumentType}
-							onSelect={setArgumentType}
+							onSelect={(type) => {
+								setArgumentType(type);
+								// Selecting a different type clears the AI suggestion label
+								if (type !== aiSuggestion?.suggestedType) {
+									setAiSuggestion(null);
+								}
+							}}
+							aiSuggestedType={aiSuggestion?.suggestedType ?? null}
 						/>
 					</div>
 					<div className="mt-3 flex justify-between">
