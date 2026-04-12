@@ -60,10 +60,10 @@ export default async function DebateLayout({
 	params,
 }: {
 	children: React.ReactNode;
-	params: { id: string };
+	params: Promise<{ id: string }>;
 }) {
 	const supabase = createServiceRoleClient();
-	const debateId = params.id;
+	const { id: debateId } = await params;
 
 	// Resolve current user from anon cookie
 	const cookieStore = await cookies();

@@ -101,14 +101,15 @@ function computeDepths(args: Argument[]): Map<string, number> {
 export async function generateMetadata({
 	params,
 }: {
-	params: { id: string };
+	params: Promise<{ id: string }>;
 }): Promise<Metadata> {
+	const { id } = await params;
 	const supabase = createServiceRoleClient();
 
 	const { data: debateRow } = await supabase
 		.from("debates")
 		.select("claim_text")
-		.eq("id", params.id)
+		.eq("id", id)
 		.single();
 
 	if (!debateRow) {
@@ -120,12 +121,12 @@ export async function generateMetadata({
 	const { count: argCount } = await supabase
 		.from("arguments")
 		.select("*", { count: "exact", head: true })
-		.eq("debate_id", params.id);
+		.eq("debate_id", id);
 
 	const { count: voteCount } = await supabase
 		.from("votes")
 		.select("arguments!inner(debate_id)", { count: "exact", head: true })
-		.eq("arguments.debate_id", params.id);
+		.eq("arguments.debate_id", id);
 
 	const argNum = argCount ?? 0;
 	const voteNum = voteCount ?? 0;
@@ -152,10 +153,10 @@ export async function generateMetadata({
 export default async function PublicDebatePage({
 	params,
 }: {
-	params: { id: string };
+	params: Promise<{ id: string }>;
 }) {
 	const supabase = createServiceRoleClient();
-	const debateId = params.id;
+	const { id: debateId } = await params;
 
 	const { data: debateRow, error: debateError } = await supabase
 		.from("debates")

@@ -8,7 +8,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
  */
 export async function POST(
 	_request: Request,
-	{ params }: { params: { id: string } },
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	const anonId = await getAnonId();
 	if (!anonId) {
@@ -24,7 +24,7 @@ export async function POST(
 		return NextResponse.json({ error: "User not found" }, { status: 401 });
 	}
 
-	const debateId = params.id;
+	const { id: debateId } = await params;
 
 	// Fetch debate
 	const { data: debate, error: debateError } = await supabase
@@ -103,7 +103,7 @@ export async function POST(
  */
 export async function PATCH(
 	request: Request,
-	{ params }: { params: { id: string } },
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	const anonId = await getAnonId();
 	if (!anonId) {
@@ -134,7 +134,7 @@ export async function PATCH(
 	}
 	const action = body.action;
 
-	const debateId = params.id;
+	const { id: debateId } = await params;
 
 	// Fetch debate
 	const { data: debate, error: debateError } = await supabase
