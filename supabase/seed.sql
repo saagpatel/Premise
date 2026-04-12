@@ -165,3 +165,11 @@ CREATE POLICY "votes readable by all" ON votes FOR SELECT USING (true);
 
 -- Flags: readable by all (for flag count display)
 CREATE POLICY "flags readable by all" ON flags FOR SELECT USING (true);
+
+-- ── Functions ────────────────────────────────────────────────────────
+
+-- Atomic vote score increment — avoids read-modify-write races.
+CREATE OR REPLACE FUNCTION increment_vote_score(arg_id UUID, delta INT)
+RETURNS void AS $$
+  UPDATE arguments SET net_vote_score = net_vote_score + delta WHERE id = arg_id;
+$$ LANGUAGE sql;
