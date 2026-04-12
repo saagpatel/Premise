@@ -173,3 +173,10 @@ CREATE OR REPLACE FUNCTION increment_vote_score(arg_id UUID, delta INT)
 RETURNS void AS $$
   UPDATE arguments SET net_vote_score = net_vote_score + delta WHERE id = arg_id;
 $$ LANGUAGE sql;
+
+-- Atomic flag count increment — avoids read-modify-write races.
+CREATE OR REPLACE FUNCTION increment_flag_count(arg_id UUID)
+RETURNS INTEGER AS $$
+  UPDATE arguments SET flag_count = flag_count + 1 WHERE id = arg_id
+  RETURNING flag_count;
+$$ LANGUAGE sql;
