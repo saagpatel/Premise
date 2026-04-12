@@ -4,7 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export async function POST(
 	request: Request,
-	{ params }: { params: { id: string } },
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	const anonId = await getAnonId();
 	if (!anonId) {
@@ -35,7 +35,7 @@ export async function POST(
 		);
 	}
 
-	const debateId = params.id;
+	const { id: debateId } = await params;
 
 	try {
 		// Fetch debate

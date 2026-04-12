@@ -24,10 +24,10 @@ function buildTree(args: Argument[]): Argument[] {
 
 export async function GET(
 	_request: Request,
-	{ params }: { params: { id: string } },
+	{ params }: { params: Promise<{ id: string }> },
 ) {
 	const supabase = await createServerSupabaseClient();
-	const debateId = params.id;
+	const { id: debateId } = await params;
 
 	try {
 		// Fetch debate
