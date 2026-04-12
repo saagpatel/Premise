@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import type { Argument, DebateStatus, Participant } from "@/types";
@@ -235,12 +236,12 @@ export default async function PublicDebatePage({
 						>
 							{STATUS_LABELS[status]}
 						</span>
-						<a
+						<Link
 							href="/"
 							className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
 						>
 							← Back to Premise
-						</a>
+						</Link>
 					</div>
 					<h1 className="text-2xl font-bold leading-snug text-gray-900">
 						{claimText}
@@ -352,18 +353,18 @@ export default async function PublicDebatePage({
 						Want to debate? Join this debate or start your own.
 					</p>
 					<div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-						<a
+						<Link
 							href={`/d/${debateId}?join=against`}
 							className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
 						>
 							Join this debate
-						</a>
-						<a
+						</Link>
+						<Link
 							href="/"
 							className="rounded-lg border border-gray-200 px-6 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
 						>
 							Start your own
-						</a>
+						</Link>
 					</div>
 				</div>
 			</div>
