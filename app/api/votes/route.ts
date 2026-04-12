@@ -3,7 +3,7 @@ import { getAnonId, resolveUserId } from "@/lib/anon-identity";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-	const anonId = getAnonId();
+	const anonId = await getAnonId();
 	if (!anonId) {
 		return NextResponse.json(
 			{ error: "Anonymous identity required" },

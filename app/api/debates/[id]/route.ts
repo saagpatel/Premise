@@ -26,7 +26,7 @@ export async function GET(
 	_request: Request,
 	{ params }: { params: { id: string } },
 ) {
-	const supabase = createServerSupabaseClient();
+	const supabase = await createServerSupabaseClient();
 	const debateId = params.id;
 
 	try {

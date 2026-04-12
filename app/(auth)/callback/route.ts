@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 		return NextResponse.redirect(new URL("/sign-in?error=no_code", origin));
 	}
 
-	const supabase = createServerSupabaseClient();
+	const supabase = await createServerSupabaseClient();
 	const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
 	if (error || !data.session) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 	const session = data.session;
 
 	// Fire-and-forget: link anon identity to authenticated user
-	const cookieStore = cookies();
+	const cookieStore = await cookies();
 	const anonCookie = cookieStore.get("premise-anon-id");
 
 	if (anonCookie?.value) {

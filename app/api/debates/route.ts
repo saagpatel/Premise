@@ -89,7 +89,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-	const anonId = getAnonId();
+	const anonId = await getAnonId();
 	if (!anonId) {
 		return NextResponse.json(
 			{

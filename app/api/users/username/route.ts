@@ -4,7 +4,7 @@ import { getAnonId, resolveUserId } from "@/lib/anon-identity";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export async function PATCH(request: Request) {
-	const anonId = getAnonId();
+	const anonId = await getAnonId();
 
 	if (!anonId) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
