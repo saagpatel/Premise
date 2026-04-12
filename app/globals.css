@@ -17,3 +17,19 @@
 		opacity: 0.6;
 	}
 }
+
+@keyframes nodeAppear {
+	from {
+		opacity: 0;
+		transform: scale(0);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.node-appear {
+	animation: nodeAppear 0.3s ease-out forwards;
+	opacity: 0;
+}
