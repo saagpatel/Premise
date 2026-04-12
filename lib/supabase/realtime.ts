@@ -8,6 +8,10 @@ type Callbacks = {
 	onVote: (data: { argumentId: string; vote: string }) => void;
 };
 
+// Mutable set of argument IDs belonging to the current debate.
+// Updated by the argument INSERT handler so vote events can be filtered.
+type DebateArgumentIds = Set<string>;
+
 function mapRowToArgument(row: Record<string, unknown>): Argument {
 	return {
 		id: row.id as string,
@@ -27,7 +31,12 @@ export function createDebateChannel(
 	debateId: string,
 	supabase: SupabaseClient,
 	callbacks: Callbacks,
+	initialArgumentIds: DebateArgumentIds = new Set(),
 ) {
+	// Track which argument IDs belong to this debate so vote events for other
+	// debates (delivered before server-side filtering) can be discarded.
+	const debateArgumentIds: DebateArgumentIds = new Set(initialArgumentIds);
+
 	let connectionState: ConnectionState = "paused";
 	const stateChangeListeners: Array<(state: ConnectionState) => void> = [];
 	let lastEventAt = Date.now();
@@ -54,7 +63,10 @@ export function createDebateChannel(
 			(payload) => {
 				lastEventAt = Date.now();
 				const row = payload.new as Record<string, unknown>;
-				callbacks.onArgument(mapRowToArgument(row));
+				const arg = mapRowToArgument(row);
+				// Register new argument so subsequent vote events can be matched.
+				debateArgumentIds.add(arg.id);
+				callbacks.onArgument(arg);
 			},
 		)
 		.on(
@@ -67,10 +79,12 @@ export function createDebateChannel(
 			(payload) => {
 				lastEventAt = Date.now();
 				const row = payload.new as Record<string, unknown>;
-				callbacks.onVote({
-					argumentId: row.argument_id as string,
-					vote: row.vote as string,
-				});
+				const argumentId = row.argument_id as string;
+				// Discard vote events that belong to a different debate.
+				// Supabase realtime doesn't support filtering on a join column, so
+				// we filter client-side using the set of known argument IDs.
+				if (!debateArgumentIds.has(argumentId)) return;
+				callbacks.onVote({ argumentId, vote: row.vote as string });
 			},
 		);
 

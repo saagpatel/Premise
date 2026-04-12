@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 		// Fetch the argument to get its debate_id
 		const { data: argument, error: argumentError } = await supabase
 			.from("arguments")
-			.select("id, debate_id, net_vote_score")
+			.select("id, debate_id")
 			.eq("id", argumentId)
 			.single();
 
@@ -93,24 +93,23 @@ export async function POST(request: Request) {
 			);
 		}
 
-		// Update net_vote_score: fetch-then-update (no atomic RPC available)
+		// Atomically increment net_vote_score via DB function — avoids read-modify-write races.
 		const delta = vote === "strong" ? 1 : -1;
-		const newScore = (argument.net_vote_score as number) + delta;
 
-		const { error: updateError } = await supabase
-			.from("arguments")
-			.update({ net_vote_score: newScore })
-			.eq("id", argumentId);
+		const { error: rpcError } = await supabase.rpc("increment_vote_score", {
+			arg_id: argumentId,
+			delta,
+		});
 
-		if (updateError) {
-			console.error("Failed to update net_vote_score:", updateError.message);
+		if (rpcError) {
+			console.error("Failed to update net_vote_score:", rpcError.message);
 			return NextResponse.json(
 				{ error: "Vote recorded but score update failed" },
 				{ status: 500 },
 			);
 		}
 
-		return NextResponse.json({ argumentId, newScore }, { status: 201 });
+		return NextResponse.json({ argumentId }, { status: 201 });
 	} catch (err) {
 		console.error("Unexpected error casting vote:", err);
 		return NextResponse.json(

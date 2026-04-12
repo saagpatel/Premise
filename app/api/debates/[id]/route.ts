@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Argument } from "@/types";
 
 function buildTree(args: Argument[]): Argument[] {
@@ -26,7 +26,7 @@ export async function GET(
 	_request: Request,
 	{ params }: { params: { id: string } },
 ) {
-	const supabase = createServiceRoleClient();
+	const supabase = createServerSupabaseClient();
 	const debateId = params.id;
 
 	try {
