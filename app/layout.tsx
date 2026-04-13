@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-	title: "Premise — Structured Debate",
+	title: "Premise — Structured Debate Platform",
 	description:
-		"A debate platform where every argument must be categorized and linked to a specific parent claim.",
+		"An open-source debate platform where every argument is categorized, linked to claims, and voted on by spectators. Built with Next.js and Supabase.",
 };
 
 export default function RootLayout({
@@ -14,7 +14,9 @@ export default function RootLayout({
 }) {
 	return (
 		<html lang="en">
-			<body>{children}</body>
+			<body>
+				<main>{children}</main>
+			</body>
 		</html>
 	);
 }
