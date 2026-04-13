@@ -1,7 +1,24 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { classifyArgument } from "@/lib/classify";
+import { checkRateLimit } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+	const ip =
+		request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+		request.headers.get("x-real-ip") ??
+		"unknown";
+
+	const { allowed, retryAfterMs } = checkRateLimit(ip);
+	if (!allowed) {
+		return NextResponse.json(
+			{ error: "Rate limit exceeded" },
+			{
+				status: 429,
+				headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+			},
+		);
+	}
+
 	let body: { contentText?: unknown };
 	try {
 		body = await request.json();
