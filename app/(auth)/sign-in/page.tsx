@@ -24,7 +24,7 @@ export default function SignInPage() {
 		const { error: authError } = await supabase.auth.signInWithOtp({
 			email: email.trim(),
 			options: {
-				emailRedirectTo: window.location.origin + "/auth/callback",
+				emailRedirectTo: window.location.origin + "/callback",
 			},
 		});
 
@@ -48,7 +48,7 @@ export default function SignInPage() {
 		const { error: authError } = await supabase.auth.signInWithOAuth({
 			provider: "github",
 			options: {
-				redirectTo: window.location.origin + "/auth/callback",
+				redirectTo: window.location.origin + "/callback",
 			},
 		});
 
