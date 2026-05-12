@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
@@ -19,6 +20,7 @@ export default async function RootLayout({
 		<html lang="en" {...(nonce ? { nonce } : {})}>
 			<body>
 				<main>{children}</main>
+				<Analytics />
 			</body>
 		</html>
 	);
