@@ -71,6 +71,8 @@ See IMPLEMENTATION-ROADMAP.md → Phase 0 for exact tasks and acceptance criteri
 
 ## How To Run
 
+- Run the local development server with `npm run dev`.
+
 ```bash
 npm run dev
 ```
