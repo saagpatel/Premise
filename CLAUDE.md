@@ -102,3 +102,8 @@ pnpm dev
 Phases 0–4 are complete. Confirm production Supabase posture, run Playwright E2E against the deployed Vercel URL, and set production env vars per `DEPLOY.md` before publicly announcing.
 
 <!-- portfolio-context:end -->
+
+<!-- secondbrain-breadcrumb -->
+## SecondBrain knowledge vault
+
+Prior lessons, decisions, and context for this project live in SecondBrain at `wiki/maps/projects/premise.md`. The whole vault is searchable via the `engraph` MCP — query it for this project + its stack before non-trivial work.
