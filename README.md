@@ -9,10 +9,10 @@ Premise is an open-source structured debate platform. Two participants argue a c
 ## Features
 
 - **Typed argument nodes** — `evidence`, `analogy`, `counterexample`, `reductio`, `authority`, `concession`, `clarification`
-- **Live D3 tree** — interactive force-directed graph; crux nodes highlighted; stroke weight scales with vote score
+- **Live D3 tree** — interactive tree (d3.tree() Reingold-Tilford layout); crux nodes highlighted; stroke weight scales with vote score
 - **Weighted voting** — `strong` and `weak` votes update in real time via Supabase Realtime
 - **Anonymous participation** — cookie-based identity, no account required; authenticated accounts also supported
-- **AI argument classifier** — optional Claude-powered type suggester as you write (requires Anthropic API key)
+- **AI argument classifier** — optional type suggester as you write; uses Anthropic API if `ANTHROPIC_API_KEY` is set, falls back to Ollama if available, or degrades gracefully with no key
 - **Invite links** — shareable join links that pre-assign the invited participant to the opposing side
 
 ## Quick Start
@@ -24,14 +24,14 @@ Premise is an open-source structured debate platform. Two participants argue a c
 
 ### Installation
 ```bash
-npm install
+pnpm install
 cp .env.example .env.local
 # Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
 
 ### Usage
 ```bash
-npm run dev
+pnpm dev
 ```
 
 ## Tech Stack
