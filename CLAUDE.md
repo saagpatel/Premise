@@ -1,10 +1,10 @@
 # Premise
 
-Structured debate platform where every argument is typed (evidence, analogy, counterexample, etc.) and linked to a parent claim. Live D3.js argument tree; spectators vote per node — not sides. Next.js 14 + Supabase (BYOS), deployed to Vercel, MIT licensed.
+Structured debate platform where every argument is typed (evidence, analogy, counterexample, etc.) and linked to a parent claim. Live D3.js argument tree; spectators vote per node — not sides. Next.js 15 + Supabase (BYOS), deployed to Vercel, MIT licensed.
 
 ## Stack
 - **Language:** TypeScript 5.4+ — strict mode, `unknown` + narrowing (no `any`)
-- **Framework:** Next.js 14.2+ (App Router, Server Actions)
+- **Framework:** Next.js 15.5+ (App Router, Server Actions)
 - **Database:** Supabase (PostgreSQL) — Realtime, RLS, Auth
 - **Supabase Client:** @supabase/ssr 0.4+ — App Router-aware, cookie sessions
 - **Visualization:** D3.js 7.9+ — `d3.tree()` layout, zoom/pan, animated transitions
@@ -19,7 +19,7 @@ pnpm dev          # local dev server
 pnpm build        # production build
 pnpm lint         # ESLint
 npx tsc --noEmit  # type-check
-pnpm test         # unit tests (Vitest)
+pnpm exec vitest run  # unit tests (Vitest — no "test" script in package.json)
 pnpm exec playwright test  # e2e tests
 ```
 
@@ -65,8 +65,8 @@ Premise is an open-source, structured debate platform where every argument must 
 
 ## Current State
 
-**Phase 0: Foundation**
-See IMPLEMENTATION-ROADMAP.md → Phase 0 for exact tasks and acceptance criteria.
+**Phases 0–4 complete — launch-ready.**
+Foundation, core debate flow, real-time + voting, auth + discovery, and launch prep are all shipped. See IMPLEMENTATION-ROADMAP.md for full task history and DEPLOY.md for the production runbook.
 
 ## Stack
 
@@ -81,10 +81,10 @@ See IMPLEMENTATION-ROADMAP.md → Phase 0 for exact tasks and acceptance criteri
 
 ## How To Run
 
-- Run the local development server with `npm run dev`.
+- Run the local development server with `pnpm dev`.
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 ## Known Risks
@@ -99,6 +99,6 @@ npm run dev
 
 ## Next Recommended Move
 
-Finish the current Phase 0 foundation tasks from `IMPLEMENTATION-ROADMAP.md`, then verify Supabase RLS, cookie identity, and the D3 tree contract before adding later debate features.
+Phases 0–4 are complete. Confirm production Supabase posture, run Playwright E2E against the deployed Vercel URL, and set production env vars per `DEPLOY.md` before publicly announcing.
 
 <!-- portfolio-context:end -->
