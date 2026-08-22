@@ -23,25 +23,39 @@ export async function GET(request: Request) {
 
 	const session = data.session;
 
-	// Fire-and-forget: link anon identity to authenticated user
+	const serviceClient = createServiceRoleClient();
+
+	// Link the anonymous identity to the authenticated user.
+	//
+	// This used to POST to /api/auth/anon-id over HTTP. That route identifies the
+	// anonymous user from the `premise-anon-id` cookie on the incoming request,
+	// and a server-to-server fetch sends no cookies, so the call always came back
+	// 400 "No anonymous identity cookie found" — and because it was
+	// fire-and-forget the failure only ever reached the server log. Every
+	// anonymous user who signed in silently lost their history.
+	//
+	// The cookie is readable right here, and the service client can do the same
+	// update directly, so the HTTP hop is removed rather than repaired.
 	const cookieStore = await cookies();
 	const anonCookie = cookieStore.get("premise-anon-id");
 
 	if (anonCookie?.value) {
-		const appBaseUrl =
-			process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+		const { error: linkError } = await serviceClient
+			.from("users")
+			.update({ auth_id: session.user.id })
+			.eq("anon_id", anonCookie.value);
 
-		fetch(`${appBaseUrl}/api/auth/anon-id`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ authId: session.user.id }),
-		}).catch((err: unknown) => {
-			console.error("[callback] Failed to link anon identity:", err);
-		});
+		if (linkError) {
+			// Non-fatal: the user is authenticated either way, they just keep a
+			// separate anonymous row. Surfaced so it is diagnosable.
+			console.error(
+				"[callback] Failed to link anon identity:",
+				linkError.message,
+			);
+		}
 	}
 
 	// Check if user has a username set
-	const serviceClient = createServiceRoleClient();
 	const { data: userRow } = await serviceClient
 		.from("users")
 		.select("id, username")
