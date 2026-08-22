@@ -3,13 +3,13 @@
 // structure error while loading the legacy config, so nothing was actually
 // being linted. (CI only runs `pnpm build`, so this went unnoticed.)
 //
-// package.json still declares eslint ^8 / eslint-config-next ^15 while the
-// installed tree resolved to eslint 9 and eslint-config-next 16; this config
-// targets what is actually installed.
+// Invoked via `pnpm lint` -> `eslint .`. It is deliberately not `next lint`:
+// Next 16 removed that command, so `next lint` is parsed as `next <dir>` and
+// fails with "Invalid project directory provided, no such directory: ./lint".
 import coreWebVitals from "eslint-config-next/core-web-vitals";
 import typescript from "eslint-config-next/typescript";
 
-export default [
+const config = [
 	{
 		ignores: [
 			".next/**",
@@ -42,3 +42,5 @@ export default [
 		},
 	},
 ];
+
+export default config;
