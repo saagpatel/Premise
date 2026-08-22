@@ -1,53 +1,53 @@
 {
-	"name": "premise",
-	"version": "0.1.0",
-	"private": true,
-	"license": "MIT",
-	"packageManager": "pnpm@10.25.0",
-	"scripts": {
-		"dev": "next dev",
-		"build": "next build",
-		"start": "next start",
-		"lint": "eslint .",
-		"type-check": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@anthropic-ai/sdk": "0.117.1",
-		"@sentry/nextjs": "10.70.0",
-		"@supabase/ssr": "0.12.4",
-		"@supabase/supabase-js": "2.112.3",
-		"@vercel/analytics": "2.0.1",
-		"clsx": "2.1.1",
-		"d3": "7.9.0",
-		"framer-motion": "12.42.2",
-		"next": "16.3.2",
-		"react": "19.2.8",
-		"react-dom": "19.2.8",
-		"tailwind-merge": "3.6.0"
-	},
-	"devDependencies": {
-		"@playwright/test": "1.62.1",
-		"@tailwindcss/postcss": "4.3.3",
-		"@types/d3": "7.4.3",
-		"@types/node": "25.9.2",
-		"@types/react": "19.2.18",
-		"@types/react-dom": "18.3.7",
-		"@vitejs/plugin-react": "6.0.5",
-		"autoprefixer": "10.5.4",
-		"eslint": "9.39.4",
-		"eslint-config-next": "16.3.1",
-		"postcss": "8.5.23",
-		"tailwindcss": "4.3.3",
-		"typescript": "6.0.3",
-		"vite": "8.2.1",
-		"vitest": "4.1.11"
-	},
-	"overrides": {
-		"@babel/core": "7.29.6",
-		"@opentelemetry/core": "2.8.0",
-		"js-yaml": "5.2.0",
-		"postcss": "8.5.23",
-		"vite": "8.2.1",
-		"ws": "8.21.0"
-	}
+  "name": "premise",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@10.25.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.117.1",
+    "@sentry/nextjs": "10.70.0",
+    "@supabase/ssr": "0.12.4",
+    "@supabase/supabase-js": "2.112.3",
+    "@vercel/analytics": "2.0.1",
+    "clsx": "2.1.1",
+    "d3": "7.9.0",
+    "framer-motion": "12.42.2",
+    "next": "16.3.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/d3": "7.4.3",
+    "@types/node": "^26.1.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "6.0.5",
+    "autoprefixer": "10.5.4",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.3.1",
+    "postcss": "8.5.23",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.2.1",
+    "vitest": "4.1.11"
+  },
+  "overrides": {
+    "@babel/core": "7.29.6",
+    "@opentelemetry/core": "2.8.0",
+    "js-yaml": "5.2.0",
+    "postcss": "8.5.23",
+    "vite": "8.2.1",
+    "ws": "8.21.0"
+  }
 }
