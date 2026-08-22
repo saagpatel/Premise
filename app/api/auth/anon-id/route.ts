@@ -44,49 +44,16 @@ export async function GET() {
 	return response;
 }
 
-/**
- * POST /api/auth/anon-id
- * Links an anonymous user to an authenticated Supabase Auth user.
- * Body: { authId: string }
- */
-export async function POST(request: Request) {
-	const cookieStore = await cookies();
-	const existing = cookieStore.get(COOKIE_NAME);
-
-	if (!existing?.value) {
-		return NextResponse.json(
-			{ error: "No anonymous identity cookie found" },
-			{ status: 400 },
-		);
-	}
-
-	let body: { authId?: string };
-	try {
-		body = await request.json();
-	} catch {
-		return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-	}
-
-	if (!body.authId || typeof body.authId !== "string") {
-		return NextResponse.json(
-			{ error: "Missing or invalid authId" },
-			{ status: 422 },
-		);
-	}
-
-	const supabase = createServiceRoleClient();
-	const { error } = await supabase
-		.from("users")
-		.update({ auth_id: body.authId })
-		.eq("anon_id", existing.value);
-
-	if (error) {
-		console.error("Failed to link auth identity:", error.message);
-		return NextResponse.json(
-			{ error: "Failed to link authenticated identity" },
-			{ status: 500 },
-		);
-	}
-
-	return NextResponse.json({ success: true });
-}
+// The POST handler that used to live here linked an anonymous identity to an
+// authenticated user, taking the target auth id straight from the request body.
+// It trusted the caller completely: anyone holding any anonymous cookie could
+// POST another person's auth uid and attach their own anonymous row to that
+// account, which is an account-linking abuse path with no authentication behind
+// it. It also had no legitimate caller left — the only one was the auth
+// callback, which linked over HTTP without forwarding the cookie this route
+// reads, so it always failed with 400.
+//
+// Linking now happens in app/(auth)/callback/route.ts, where the auth id comes
+// from an exchanged Supabase session rather than from user input, and the
+// anonymous cookie is read directly. There is no route that accepts an auth id
+// from a client, and there should not be one.

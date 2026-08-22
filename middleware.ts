@@ -7,16 +7,32 @@ export function middleware(request: NextRequest) {
 	let supabaseConnectSrc = "";
 	if (supabaseUrl) {
 		try {
-			const hostname = new URL(supabaseUrl).hostname;
-			supabaseConnectSrc = `https://${hostname} wss://${hostname}`;
+			// Use `host` (includes any explicit port) and keep the URL's own scheme.
+			// `hostname` drops the port, so a self-hosted or local Supabase on e.g.
+			// :54321 produced `wss://127.0.0.1`, which never matches
+			// `ws://127.0.0.1:54321` — realtime was silently blocked by CSP while
+			// the page otherwise looked healthy. Hosted projects are on the default
+			// port over https, which is why this only bit non-default-port setups.
+			const { host, protocol } = new URL(supabaseUrl);
+			const isSecure = protocol === "https:";
+			const httpOrigin = `${isSecure ? "https" : "http"}://${host}`;
+			const wsOrigin = `${isSecure ? "wss" : "ws"}://${host}`;
+			supabaseConnectSrc = `${httpOrigin} ${wsOrigin}`;
 		} catch {
 			// invalid URL, skip
 		}
 	}
 
+	// Next's development runtime evaluates modules via eval(). Without this the
+	// dev server still renders, but any chunk that needs eval silently fails to
+	// initialise — which took out the realtime subscription while the page
+	// otherwise looked fine. Production builds need no eval, so the relaxation
+	// is strictly scoped to development.
+	const evalSrc = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
+
 	const csp = [
 		"default-src 'self'",
-		`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+		`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${evalSrc}`,
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data: blob:",
 		"font-src 'self'",

@@ -41,8 +41,9 @@ function ThumbDownIcon() {
 	);
 }
 
+// `argumentId` stays in Props for callers, but this component never reads it —
+// so it is simply not destructured rather than bound to an unused alias.
 export function VotingControls({
-	argumentId: _argumentId,
 	currentScore,
 	isParticipant,
 	hasVoted,
