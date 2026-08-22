@@ -42,6 +42,55 @@ export async function GET() {
 		} satisfies HealthCheckResult);
 	}
 
+	// Preferred path: one SECURITY DEFINER RPC created by supabase/seed.sql that
+	// reads the catalogs directly. PostgREST cannot expose information_schema,
+	// pg_tables or pg_publication_tables, so the legacy probes below always
+	// failed — and their fallbacks reported RLS as healthy simply because the
+	// check had errored. A check that cannot fail is not a check.
+	const { data: health, error: healthError } = await supabase.rpc(
+		"premise_health" as string,
+	);
+
+	if (!healthError && health) {
+		const h = health as {
+			tables: string[];
+			rls_disabled: string[];
+			realtime: string[];
+		};
+
+		const existing = new Set(h.tables ?? []);
+		result.missingTables = EXPECTED_TABLES.filter((t) => !existing.has(t));
+		if (result.missingTables.length > 0) {
+			result.tablesExist = false;
+			result.errors.push(
+				`Missing tables: ${result.missingTables.join(", ")}. Run: psql $DATABASE_URL -f supabase/seed.sql`,
+			);
+		}
+
+		if ((h.rls_disabled ?? []).length > 0) {
+			result.rlsEnabled = false;
+			result.errors.push(`RLS not enabled on: ${h.rls_disabled.join(", ")}`);
+		}
+
+		const published = new Set(h.realtime ?? []);
+		const missingRealtime = REALTIME_TABLES.filter((t) => !published.has(t));
+		if (missingRealtime.length > 0) {
+			result.realtimeEnabled = false;
+			result.errors.push(
+				`Realtime not enabled on: ${missingRealtime.join(", ")}. Re-run supabase/seed.sql, which adds them to the supabase_realtime publication.`,
+			);
+		}
+
+		return NextResponse.json(result);
+	}
+
+	// Fallback for a database seeded before premise_health() existed. It can
+	// still confirm tables by probing them, but it cannot see RLS or realtime,
+	// and says so instead of assuming they are fine.
+	result.errors.push(
+		"premise_health() not found — re-run supabase/seed.sql to enable full verification. Falling back to table probes.",
+	);
+
 	// Check which tables exist
 	const { data: tables, error: tablesError } = await supabase
 		.from("information_schema.tables" as string)
@@ -106,9 +155,12 @@ export async function GET() {
 		.in("tablename", [...EXPECTED_TABLES]);
 
 	if (rlsError) {
-		// pg_tables may not be exposed via PostgREST — probe each table
+		// pg_tables is not exposed via PostgREST. Report this as unverified
+		// rather than healthy — reporting `true` here made an unrunnable check
+		// indistinguishable from a passing one.
+		result.rlsEnabled = false;
 		result.errors.push(
-			"Could not verify RLS status directly. Ensure RLS is enabled on all tables via Supabase Studio.",
+			"Could not verify RLS status. Re-run supabase/seed.sql so premise_health() exists, or check Supabase Studio → Database → Tables.",
 		);
 	} else {
 		const tablesWithoutRls = (pgTables ?? [])
