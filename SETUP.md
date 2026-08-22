@@ -44,18 +44,15 @@ psql $DATABASE_URL -f supabase/seed.sql
 
 Your `DATABASE_URL` is in **Supabase Studio → Settings → Database → Connection string → URI**.
 
-This creates 7 tables (`users`, `debates`, `participants`, `arguments`, `votes`, `invitations`, `flags`) with indexes and Row Level Security policies.
+This creates 7 tables (`users`, `debates`, `participants`, `arguments`, `votes`, `invitations`, `flags`) with indexes, Row Level Security policies, the table privileges the API roles need, and the `supabase_realtime` publication membership.
 
-## 4. Enable Realtime
+The file is idempotent — re-running it is safe and is the supported way to repair a drifted database.
 
-This step must be done manually in Supabase Studio:
+## 4. Realtime — nothing to do
 
-1. Go to **Database → Replication**
-2. Find the `supabase_realtime` publication
-3. Enable replication for the `arguments` table
-4. Enable replication for the `votes` table
+`seed.sql` adds `arguments` and `votes` to the `supabase_realtime` publication for you, so spectators see new arguments and votes live with no manual step.
 
-These tables need Realtime so spectators see new arguments and votes appear live.
+(Earlier versions of this guide said Realtime had to be switched on by hand in **Database → Replication** and could not be set from SQL. That was wrong: publication membership is ordinary DDL, and leaving it manual meant a by-the-book install looked healthy while live updates silently never arrived.)
 
 ## 5. Start Development Server
 
@@ -137,7 +134,13 @@ psql $DATABASE_URL -f supabase/seed.sql
 
 ### Realtime not enabled
 
-Realtime must be enabled manually in Supabase Studio (see Step 4 above). It cannot be done via SQL or the CLI.
+Re-run `psql $DATABASE_URL -f supabase/seed.sql`. It adds `arguments` and `votes` to the `supabase_realtime` publication (guarded, so re-running is safe).
+
+If the health check reports Realtime as fine but spectators still see nothing live, check the browser console for a Content-Security-Policy error on the websocket. The CSP in `middleware.ts` is derived from `NEXT_PUBLIC_SUPABASE_URL`, including its port — a mismatch there blocks the realtime socket while the rest of the page works normally.
+
+### "permission denied for table ..."
+
+The API roles have no rights on tables they were not granted. `seed.sql` issues those grants (`SELECT` for `anon`/`authenticated`, full CRUD for `service_role`); if you created the tables another way, re-run the seed.
 
 ### RLS blocking reads you expect to work
 
@@ -149,7 +152,9 @@ Public debates and their arguments are readable without authentication. If you'r
 
 ### "Could not verify RLS status"
 
-The health check queries `pg_tables` which may not be exposed via PostgREST in all Supabase configurations. Verify manually: **Supabase Studio → Database → Tables** — each table should show a lock icon indicating RLS is active.
+The health check reads the catalogs through the `premise_health()` function created by `seed.sql`. This message means that function is missing — re-run `psql $DATABASE_URL -f supabase/seed.sql`.
+
+An unverifiable check now reports `false`, not `true`: if the health check cannot confirm RLS, it will not claim RLS is fine.
 
 ### GitHub OAuth callback URL mismatch
 
