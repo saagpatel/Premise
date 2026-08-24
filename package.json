@@ -12,7 +12,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.117.1",
+    "@anthropic-ai/sdk": "0.120.0",
     "@sentry/nextjs": "10.70.0",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.3",
@@ -32,22 +32,22 @@
     "@types/node": "^26.1.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "18.3.7",
-    "@vitejs/plugin-react": "6.0.5",
+    "@vitejs/plugin-react": "6.1.0",
     "autoprefixer": "10.5.4",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.3.1",
-    "postcss": "8.5.23",
+    "eslint-config-next": "16.3.2",
+    "postcss": "8.5.26",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vite": "8.2.1",
+    "vite": "8.2.2",
     "vitest": "4.1.11"
   },
   "overrides": {
     "@babel/core": "7.29.6",
     "@opentelemetry/core": "2.8.0",
     "js-yaml": "5.2.0",
-    "postcss": "8.5.23",
-    "vite": "8.2.1",
+    "postcss": "8.5.26",
+    "vite": "8.2.2",
     "ws": "8.21.0"
   }
 }
