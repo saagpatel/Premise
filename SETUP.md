@@ -50,7 +50,7 @@ The file is idempotent — re-running it is safe and is the supported way to rep
 
 ## 4. Realtime — nothing to do
 
-`seed.sql` adds `arguments` and `votes` to the `supabase_realtime` publication for you, so spectators see new arguments and votes live with no manual step.
+`seed.sql` adds `arguments` and `votes` to the `supabase_realtime` publication for you. The client listens for new arguments and authoritative score updates on `arguments`; the `votes` table remains published for health checks and compatibility with existing deployments.
 
 (Earlier versions of this guide said Realtime had to be switched on by hand in **Database → Replication** and could not be set from SQL. That was wrong: publication membership is ordinary DDL, and leaving it manual meant a by-the-book install looked healthy while live updates silently never arrived.)
 

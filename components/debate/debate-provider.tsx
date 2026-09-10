@@ -87,6 +87,7 @@ export function DebateProvider({
 
 	const argsRef = useRef(args);
 	argsRef.current = args;
+	const channelRef = useRef<ReturnType<typeof createDebateChannel> | null>(null);
 
 	const participant = participants.find((p) => p.userId === currentUserId);
 
@@ -100,37 +101,45 @@ export function DebateProvider({
 			return;
 		}
 
-		const argIds = new Set(argsRef.current.map((a) => a.id));
-
-		const channel = createDebateChannel(debate.id, supabase, {
-			onArgument: (arg) => {
-				setArgs((prev) => {
-					if (prev.some((a) => a.id === arg.id)) return prev;
-					return [...prev, arg];
-				});
+		// The channel owns the debate-membership filter. Keep the initial IDs in
+		// that shared filter so existing arguments and future inserts/updates follow
+		// the same path; a provider-local snapshot would go stale after an insert.
+		const channel = createDebateChannel(
+			debate.id,
+			supabase,
+			{
+				onArgument: (arg) => {
+					setArgs((prev) => {
+						if (prev.some((a) => a.id === arg.id)) return prev;
+						return [...prev, arg];
+					});
+				},
+				onArgumentUpdate: (arg) => {
+					setArgs((prev) =>
+						prev.map((a) =>
+							a.id === arg.id
+								? {
+										...a,
+										netVoteScore: arg.netVoteScore,
+										flagCount: arg.flagCount,
+									}
+								: a,
+						),
+					);
+				},
 			},
-			onVote: ({ argumentId, vote }) => {
-				// Only process votes for arguments in this debate
-				if (!argIds.has(argumentId)) return;
-
-				const delta = vote === "strong" ? 1 : -1;
-				setArgs((prev) =>
-					prev.map((a) =>
-						a.id === argumentId
-							? { ...a, netVoteScore: a.netVoteScore + delta }
-							: a,
-					),
-				);
-			},
-		});
+			new Set(argsRef.current.map((a) => a.id)),
+		);
+		channelRef.current = channel;
 
 		channel.onStateChange(setConnectionState);
 		channel.subscribe();
 
 		return () => {
+			if (channelRef.current === channel) channelRef.current = null;
 			channel.unsubscribe();
 		};
-	}, [debate.id]);
+	}, [debate.id, currentUserId]);
 
 	// ── Refresh (full resync) ────────────────────────────────────────
 	const refreshDebate = useCallback(async () => {
@@ -138,9 +147,21 @@ export function DebateProvider({
 			const res = await fetch(`/api/debates/${debate.id}`);
 			if (!res.ok) return;
 			const data = await res.json();
+			const nextArgs = flattenTree(data.tree);
+			// Refresh can recover arguments whose INSERT was missed while the
+			// channel was reconnecting. Use refreshed rows authoritatively while
+			// retaining arguments learned concurrently by realtime, and discard
+			// buffered deltas for rows covered by the refresh.
+			setArgs((prev) => {
+				const refreshedById = new Map(nextArgs.map((arg) => [arg.id, arg]));
+				for (const arg of prev) {
+					if (!refreshedById.has(arg.id)) refreshedById.set(arg.id, arg);
+				}
+				return Array.from(refreshedById.values());
+			});
+			channelRef.current?.reconcileArgumentIds(nextArgs.map((a) => a.id));
 			setDebate(data.debate);
 			setParticipants(data.participants);
-			setArgs(flattenTree(data.tree));
 		} catch {
 			// silently fail — will retry on next action
 		}
@@ -221,8 +242,9 @@ export function DebateProvider({
 										netVoteScore: a.netVoteScore - delta,
 									}
 								: a,
-						),
+							),
 					);
+					await refreshDebate();
 				}
 			} catch {
 				// Revert on network error
@@ -237,9 +259,10 @@ export function DebateProvider({
 							: a,
 					),
 				);
+				await refreshDebate();
 			}
 		},
-		[debate.id, userVotes],
+		[debate.id, refreshDebate, userVotes],
 	);
 
 	return (
