@@ -87,6 +87,7 @@ export function DebateProvider({
 
 	const argsRef = useRef(args);
 	argsRef.current = args;
+	const channelRef = useRef<ReturnType<typeof createDebateChannel> | null>(null);
 
 	const participant = participants.find((p) => p.userId === currentUserId);
 
@@ -125,15 +126,18 @@ export function DebateProvider({
 				},
 			},
 			new Set(argsRef.current.map((a) => a.id)),
+			currentUserId,
 		);
+		channelRef.current = channel;
 
 		channel.onStateChange(setConnectionState);
 		channel.subscribe();
 
 		return () => {
+			if (channelRef.current === channel) channelRef.current = null;
 			channel.unsubscribe();
 		};
-	}, [debate.id]);
+	}, [debate.id, currentUserId]);
 
 	// ── Refresh (full resync) ────────────────────────────────────────
 	const refreshDebate = useCallback(async () => {
@@ -141,9 +145,21 @@ export function DebateProvider({
 			const res = await fetch(`/api/debates/${debate.id}`);
 			if (!res.ok) return;
 			const data = await res.json();
+			const nextArgs = flattenTree(data.tree);
+			// Refresh can recover arguments whose INSERT was missed while the
+			// channel was reconnecting. Use refreshed rows authoritatively while
+			// retaining arguments learned concurrently by realtime, and discard
+			// buffered deltas for rows covered by the refresh.
+			setArgs((prev) => {
+				const refreshedById = new Map(nextArgs.map((arg) => [arg.id, arg]));
+				for (const arg of prev) {
+					if (!refreshedById.has(arg.id)) refreshedById.set(arg.id, arg);
+				}
+				return Array.from(refreshedById.values());
+			});
+			channelRef.current?.reconcileArgumentIds(nextArgs.map((a) => a.id));
 			setDebate(data.debate);
 			setParticipants(data.participants);
-			setArgs(flattenTree(data.tree));
 		} catch {
 			// silently fail — will retry on next action
 		}
@@ -192,6 +208,7 @@ export function DebateProvider({
 			const delta = vote === "strong" ? 1 : -1;
 			const nextVotes = new Set(userVotes);
 			nextVotes.add(argumentId);
+			channelRef.current?.registerLocalVote(argumentId);
 			setUserVotes(nextVotes);
 			saveUserVotes(debate.id, nextVotes);
 
@@ -211,6 +228,7 @@ export function DebateProvider({
 				});
 
 				if (!res.ok) {
+					channelRef.current?.cancelLocalVote(argumentId);
 					// Revert optimistic update
 					const reverted = new Set(userVotes);
 					setUserVotes(reverted);
@@ -228,6 +246,7 @@ export function DebateProvider({
 					);
 				}
 			} catch {
+				channelRef.current?.cancelLocalVote(argumentId);
 				// Revert on network error
 				const reverted = new Set(userVotes);
 				setUserVotes(reverted);
