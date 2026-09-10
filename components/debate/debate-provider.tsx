@@ -100,29 +100,32 @@ export function DebateProvider({
 			return;
 		}
 
-		const argIds = new Set(argsRef.current.map((a) => a.id));
-
-		const channel = createDebateChannel(debate.id, supabase, {
-			onArgument: (arg) => {
-				setArgs((prev) => {
-					if (prev.some((a) => a.id === arg.id)) return prev;
-					return [...prev, arg];
-				});
+		// The channel owns the debate-membership filter. Keep the initial IDs in
+		// that shared filter so existing votes and future argument inserts follow
+		// the same path; a provider-local snapshot would go stale after an insert.
+		const channel = createDebateChannel(
+			debate.id,
+			supabase,
+			{
+				onArgument: (arg) => {
+					setArgs((prev) => {
+						if (prev.some((a) => a.id === arg.id)) return prev;
+						return [...prev, arg];
+					});
+				},
+				onVote: ({ argumentId, vote }) => {
+					const delta = vote === "strong" ? 1 : -1;
+					setArgs((prev) =>
+						prev.map((a) =>
+							a.id === argumentId
+								? { ...a, netVoteScore: a.netVoteScore + delta }
+								: a,
+						),
+					);
+				},
 			},
-			onVote: ({ argumentId, vote }) => {
-				// Only process votes for arguments in this debate
-				if (!argIds.has(argumentId)) return;
-
-				const delta = vote === "strong" ? 1 : -1;
-				setArgs((prev) =>
-					prev.map((a) =>
-						a.id === argumentId
-							? { ...a, netVoteScore: a.netVoteScore + delta }
-							: a,
-					),
-				);
-			},
-		});
+			new Set(argsRef.current.map((a) => a.id)),
+		);
 
 		channel.onStateChange(setConnectionState);
 		channel.subscribe();
