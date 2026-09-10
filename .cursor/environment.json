@@ -1,0 +1,4 @@
+{
+  "disableAllMcpServers": true,
+  "install": "corepack pnpm install --frozen-lockfile && corepack pnpm test"
+}
