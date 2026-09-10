@@ -333,8 +333,8 @@ GRANT EXECUTE ON FUNCTION public.premise_health() TO service_role;
 
 -- ── Realtime ─────────────────────────────────────────────────────────
 --
--- lib/supabase/realtime.ts subscribes to INSERT on `arguments` and on `votes`.
--- Those events are only delivered if both tables belong to the
+-- lib/supabase/realtime.ts subscribes to INSERT and UPDATE on `arguments`.
+-- Those events are only delivered if the table belongs to the
 -- `supabase_realtime` publication, so the membership is part of the schema
 -- rather than a manual Studio step — a fresh install otherwise looks healthy
 -- while spectators silently never see live updates.

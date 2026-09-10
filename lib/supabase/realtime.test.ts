@@ -14,11 +14,16 @@ class FakeChannel {
 	subscribeStatus: ((status: string) => void) | null = null;
 
 	on(
-		event: string,
-		config: { table: string; filter?: string },
+		_event: string,
+		config: { event: string; table: string; filter?: string },
 		callback: (payload: { new: Record<string, unknown> }) => void,
 	) {
-		this.handlers.push({ event, table: config.table, filter: config.filter, callback });
+		this.handlers.push({
+			event: config.event,
+			table: config.table,
+			filter: config.filter,
+			callback,
+		});
 		return this;
 	}
 
@@ -26,12 +31,6 @@ class FakeChannel {
 		this.subscribeStatus = callback;
 		callback("SUBSCRIBED");
 		return this;
-	}
-
-	emit(table: string, row: Record<string, unknown>) {
-		for (const handler of this.handlers) {
-			if (handler.table === table) handler.callback({ new: row });
-		}
 	}
 }
 
@@ -49,7 +48,7 @@ class FakeSupabase {
 	}
 }
 
-const argument = (id: string, debateId = "debate-1") => ({
+const argument = (id: string, debateId = "debate-1", score = 0) => ({
 	id,
 	debate_id: debateId,
 	author_id: "user-1",
@@ -57,211 +56,182 @@ const argument = (id: string, debateId = "debate-1") => ({
 	argument_type: "evidence",
 	content_text: "argument",
 	side: "for",
-	net_vote_score: 0,
+	net_vote_score: score,
 	flag_count: 0,
 	created_at: "2026-01-01T00:00:00Z",
 });
 
+function handlerFor(supabase: FakeSupabase, event: "INSERT" | "UPDATE") {
+	return supabase.channelInstance.handlers.find(
+		(handler) => handler.table === "arguments" &&
+			handler.event === event &&
+			handler.filter === "debate_id=eq.debate-1",
+	);
+}
+
 describe("createDebateChannel", () => {
-	it("accepts initial and newly inserted debate arguments, but filters unknown votes", () => {
+	it("accepts initial/new arguments and authoritative score updates", () => {
 		const supabase = new FakeSupabase();
 		const argumentsReceived: string[] = [];
-		const votesReceived: string[] = [];
+		const updatesReceived: Array<{ id: string; score: number }> = [];
 		const channel = createDebateChannel(
 			"debate-1",
 			supabase as unknown as SupabaseClient,
 			{
 				onArgument: (arg) => argumentsReceived.push(arg.id),
-				onVote: ({ argumentId }) => votesReceived.push(argumentId),
+				onArgumentUpdate: (arg) =>
+					updatesReceived.push({ id: arg.id, score: arg.netVoteScore }),
 			},
 			new Set(["initial-argument"]),
 		);
 
 		channel.subscribe();
-		supabase.channelInstance.emit("votes", {
-			argument_id: "initial-argument",
-			vote: "strong",
-			voter_id: "user-2",
-		});
-		supabase.channelInstance.emit("votes", {
-			argument_id: "other-debate-argument",
-			vote: "strong",
-			voter_id: "user-2",
-		});
-		supabase.channelInstance.emit("arguments", argument("new-argument"));
-		supabase.channelInstance.emit("votes", {
-			argument_id: "new-argument",
-			vote: "weak",
-			voter_id: "user-2",
-		});
+		const insertHandler = handlerFor(supabase, "INSERT");
+		const updateHandler = handlerFor(supabase, "UPDATE");
+		updateHandler?.callback({ new: argument("initial-argument", "debate-1", 4) });
+		insertHandler?.callback({ new: argument("new-argument") });
+		updateHandler?.callback({ new: argument("new-argument", "debate-1", -2) });
+		insertHandler?.callback({ new: argument("foreign-argument", "debate-2", 9) });
 
 		expect(argumentsReceived).toEqual(["new-argument"]);
-		expect(votesReceived).toEqual(["initial-argument", "new-argument"]);
+		expect(updatesReceived).toEqual([
+			{ id: "initial-argument", score: 4 },
+			{ id: "new-argument", score: -2 },
+		]);
 		expect(
-			supabase.channelInstance.handlers.find((handler) => handler.table === "arguments")
-				?.filter,
-	).toBe("debate_id=eq.debate-1");
+			supabase.channelInstance.handlers
+				.filter((handler) => handler.table === "arguments")
+				.map((handler) => handler.filter),
+		).toEqual(["debate_id=eq.debate-1", "debate_id=eq.debate-1"]);
 		channel.unsubscribe();
-		expect(supabase.removedChannel).toBe(supabase.channelInstance);
 	});
 
-	it("buffers vote-before-argument events and never admits a foreign argument", () => {
+	it("buffers update-before-argument and replays it after membership is proven", () => {
 		const supabase = new FakeSupabase();
-		const argumentsReceived: string[] = [];
-		const votesReceived: string[] = [];
+		const events: string[] = [];
 		const channel = createDebateChannel(
 			"debate-1",
 			supabase as unknown as SupabaseClient,
 			{
-				onArgument: (arg) => argumentsReceived.push(arg.id),
-				onVote: ({ argumentId }) => votesReceived.push(argumentId),
+				onArgument: (arg) => events.push(`insert:${arg.id}`),
+				onArgumentUpdate: (arg) => events.push(`update:${arg.id}:${arg.netVoteScore}`),
 			},
 		);
 
 		channel.subscribe();
-		supabase.channelInstance.emit("votes", {
-			argument_id: "new-argument",
-			vote: "strong",
-			voter_id: "user-2",
-		});
-		expect(votesReceived).toEqual([]);
-
-		supabase.channelInstance.emit("arguments", argument("new-argument"));
-		expect(argumentsReceived).toEqual(["new-argument"]);
-		expect(votesReceived).toEqual(["new-argument"]);
-
-		supabase.channelInstance.emit(
-			"arguments",
-			argument("foreign-argument", "debate-2"),
-		);
-		supabase.channelInstance.emit("votes", {
-			argument_id: "foreign-argument",
-			vote: "strong",
-			voter_id: "user-2",
-		});
-		expect(argumentsReceived).toEqual(["new-argument"]);
-		expect(votesReceived).toEqual(["new-argument"]);
+		const insertHandler = handlerFor(supabase, "INSERT");
+		const updateHandler = handlerFor(supabase, "UPDATE");
+		updateHandler?.callback({ new: argument("late-argument", "debate-1", 7) });
+		expect(events).toEqual([]);
+		insertHandler?.callback({ new: argument("late-argument") });
+		expect(events).toEqual(["insert:late-argument", "update:late-argument:7"]);
 		channel.unsubscribe();
 	});
 
-	it("suppresses only the originating tab's registered vote echo", () => {
+	it("discards stale updates covered by refresh, then applies delayed authoritative updates exactly", () => {
 		const supabase = new FakeSupabase();
-		const votesReceived: Array<{ argumentId: string; voterId: string }> = [];
+		const scores: number[] = [];
 		const channel = createDebateChannel(
 			"debate-1",
 			supabase as unknown as SupabaseClient,
 			{
 				onArgument: () => {},
-				onVote: ({ argumentId, voterId }) =>
-					votesReceived.push({ argumentId, voterId }),
-			},
-			new Set(["argument-1"]),
-			"user-1",
-		);
-
-		channel.subscribe();
-		channel.registerLocalVote("argument-1");
-		supabase.channelInstance.emit("votes", {
-			argument_id: "argument-1",
-			vote: "strong",
-			voter_id: "user-1",
-		});
-		expect(votesReceived).toEqual([]);
-
-		// A second tab has no pending local vote, so the same voter event is
-		// still delivered there rather than being filtered by user identity.
-		supabase.channelInstance.emit("votes", {
-			argument_id: "argument-1",
-			vote: "strong",
-			voter_id: "user-1",
-		});
-		expect(votesReceived).toEqual([{ argumentId: "argument-1", voterId: "user-1" }]);
-		channel.unsubscribe();
-	});
-
-	it("reconciles refreshed IDs without replaying stale buffered deltas", () => {
-		const supabase = new FakeSupabase();
-		const votesReceived: string[] = [];
-		const channel = createDebateChannel(
-			"debate-1",
-			supabase as unknown as SupabaseClient,
-			{
-				onArgument: () => {},
-				onVote: ({ argumentId }) => votesReceived.push(argumentId),
+				onArgumentUpdate: (arg) => scores.push(arg.netVoteScore),
 			},
 		);
 
 		channel.subscribe();
-		supabase.channelInstance.emit("votes", {
-			argument_id: "refreshed-argument",
-			vote: "weak",
-			voter_id: "user-2",
-		});
-		expect(votesReceived).toEqual([]);
+		const updateHandler = handlerFor(supabase, "UPDATE");
+		const delayed = argument("refreshed-argument", "debate-1", 1);
+		updateHandler?.callback({ new: delayed });
+		expect(scores).toEqual([]);
+
+		// The refresh already contains score 1; do not replay the buffered update.
 		channel.reconcileArgumentIds(["refreshed-argument"]);
-		// The refresh supplied an authoritative score, so the pre-refresh
-		// buffered event must be discarded rather than added again.
-		expect(votesReceived).toEqual([]);
-		supabase.channelInstance.emit("votes", {
-			argument_id: "refreshed-argument",
-			vote: "weak",
-			voter_id: "user-3",
-		});
-		expect(votesReceived).toEqual(["refreshed-argument"]);
+		expect(scores).toEqual([]);
+		// A delayed post-refresh UPDATE sets the score, never adds a delta.
+		updateHandler?.callback({ new: delayed });
+		expect(scores).toEqual([1]);
 		channel.unsubscribe();
 	});
 
 	it("retains arguments observed during a refresh interleaving", () => {
 		const supabase = new FakeSupabase();
-		const votesReceived: string[] = [];
+		const updates: string[] = [];
 		const channel = createDebateChannel(
 			"debate-1",
 			supabase as unknown as SupabaseClient,
 			{
 				onArgument: () => {},
-				onVote: ({ argumentId }) => votesReceived.push(argumentId),
+				onArgumentUpdate: (arg) => updates.push(arg.id),
 			},
-			new Set(["observed-before-refresh"]),
 		);
 
 		channel.subscribe();
-		// This ID represents an argument learned by realtime while the refresh
-		// request was in flight; reconciliation must not remove its membership.
-		supabase.channelInstance.emit("arguments", argument("concurrent-argument"));
+		const insertHandler = handlerFor(supabase, "INSERT");
+		const updateHandler = handlerFor(supabase, "UPDATE");
+		insertHandler?.callback({ new: argument("concurrent-argument") });
 		channel.reconcileArgumentIds(["returned-by-refresh"]);
-		supabase.channelInstance.emit("votes", {
-			argument_id: "concurrent-argument",
-			vote: "strong",
-			voter_id: "user-2",
-		});
-		expect(votesReceived).toEqual(["concurrent-argument"]);
+		updateHandler?.callback({ new: argument("concurrent-argument", "debate-1", 3) });
+		expect(updates).toEqual(["concurrent-argument"]);
 		channel.unsubscribe();
 	});
 
-	it("ignores malformed vote payloads", () => {
-		const supabase = new FakeSupabase();
-		const votesReceived: string[] = [];
-		const channel = createDebateChannel(
+	it("converges optimistic sender and other tab to the same authoritative score", () => {
+		const senderSupabase = new FakeSupabase();
+		const otherSupabase = new FakeSupabase();
+		let senderScore = 1; // local optimistic strong vote
+		let otherScore = 0;
+		const sender = createDebateChannel(
 			"debate-1",
-			supabase as unknown as SupabaseClient,
+			senderSupabase as unknown as SupabaseClient,
 			{
 				onArgument: () => {},
-				onVote: ({ argumentId }) => votesReceived.push(argumentId),
+				onArgumentUpdate: (arg) => (senderScore = arg.netVoteScore),
+			},
+			new Set(["argument-1"]),
+		);
+		const other = createDebateChannel(
+			"debate-1",
+			otherSupabase as unknown as SupabaseClient,
+			{
+				onArgument: () => {},
+				onArgumentUpdate: (arg) => (otherScore = arg.netVoteScore),
 			},
 			new Set(["argument-1"]),
 		);
 
+		sender.subscribe();
+		other.subscribe();
+		const authoritative = argument("argument-1", "debate-1", 1);
+		for (const fake of [senderSupabase, otherSupabase]) {
+			handlerFor(fake, "UPDATE")?.callback({ new: authoritative });
+		}
+		expect(senderScore).toBe(1);
+		expect(otherScore).toBe(1);
+		sender.unsubscribe();
+		other.unsubscribe();
+	});
+
+	it("ignores malformed argument update payloads", () => {
+		const supabase = new FakeSupabase();
+		const updates: string[] = [];
+		const channel = createDebateChannel(
+			"debate-1",
+			supabase as unknown as SupabaseClient,
+			{ onArgument: () => {}, onArgumentUpdate: (arg) => updates.push(arg.id) },
+			new Set(["argument-1"]),
+		);
+
 		channel.subscribe();
-		supabase.channelInstance.emit("votes", {
-			argument_id: "argument-1",
-			vote: "not-a-vote",
-			voter_id: "user-2",
+		const updateHandler = handlerFor(supabase, "UPDATE");
+		updateHandler?.callback({
+			new: { ...argument("argument-1"), net_vote_score: "1" },
 		});
-		supabase.channelInstance.emit("votes", {
-			argument_id: "argument-1",
-			vote: "strong",
+		updateHandler?.callback({
+			new: { ...argument("argument-1"), debate_id: "debate-2" },
 		});
-		expect(votesReceived).toEqual([]);
+		expect(updates).toEqual([]);
 		channel.unsubscribe();
 	});
 
@@ -271,7 +241,7 @@ describe("createDebateChannel", () => {
 		const channel = createDebateChannel(
 			"debate-1",
 			supabase as unknown as SupabaseClient,
-			{ onArgument: () => {}, onVote: () => {} },
+			{ onArgument: () => {}, onArgumentUpdate: () => {} },
 		);
 		channel.onStateChange((state) => states.push(state));
 		channel.subscribe();
@@ -286,13 +256,13 @@ describe("createDebateChannel", () => {
 		vi.useFakeTimers();
 		try {
 			const supabase = new FakeSupabase();
-			const votesReceived: string[] = [];
+			const updates: string[] = [];
 			const channel = createDebateChannel(
 				"debate-1",
 				supabase as unknown as SupabaseClient,
 				{
 					onArgument: () => {},
-					onVote: ({ argumentId }) => votesReceived.push(argumentId),
+					onArgumentUpdate: (arg) => updates.push(arg.id),
 				},
 				new Set(["argument-1"]),
 			);
@@ -303,12 +273,9 @@ describe("createDebateChannel", () => {
 			expect(vi.getTimerCount()).toBe(1);
 			channel.unsubscribe();
 			expect(vi.getTimerCount()).toBe(0);
-			supabase.channelInstance.emit("votes", {
-				argument_id: "argument-1",
-				vote: "strong",
-				voter_id: "user-2",
-			});
-			expect(votesReceived).toEqual([]);
+			const updateHandler = handlerFor(supabase, "UPDATE");
+			updateHandler?.callback({ new: argument("argument-1", "debate-1", 2) });
+			expect(updates).toEqual([]);
 		} finally {
 			vi.useRealTimers();
 		}

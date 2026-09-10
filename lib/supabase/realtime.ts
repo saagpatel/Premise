@@ -5,17 +5,12 @@ export type { ConnectionState };
 
 type Callbacks = {
 	onArgument: (arg: Argument) => void;
-	onVote: (data: { argumentId: string; vote: string; voterId: string }) => void;
+	onArgumentUpdate: (arg: Argument) => void;
 };
 
 type DebateArgumentIds = Iterable<string>;
-type VoteEvent = {
-	argumentId: string;
-	vote: string;
-	voterId: string;
-};
 
-const MAX_PENDING_VOTES = 256;
+const MAX_PENDING_ARGUMENT_UPDATES = 256;
 
 function mapRowToArgument(row: Record<string, unknown>): Argument {
 	return {
@@ -37,14 +32,11 @@ export function createDebateChannel(
 	supabase: SupabaseClient,
 	callbacks: Callbacks,
 	initialArgumentIds: DebateArgumentIds = new Set(),
-	localVoterId: string | null = null,
 ) {
-	// Track which argument IDs belong to this debate so vote events for other
-	// debates (delivered before server-side filtering) cannot be admitted.
+	// Track which argument IDs belong to this debate so argument updates from
+	// other debates (delivered before server-side filtering) cannot be admitted.
 	const debateArgumentIds = new Set(initialArgumentIds);
-	const pendingVotes = new Map<string, VoteEvent[]>();
-	const localVotesAwaitingEcho = new Set<string>();
-	let pendingVoteCount = 0;
+	const pendingArgumentUpdates = new Map<string, Argument>();
 
 	let connectionState: ConnectionState = "paused";
 	const stateChangeListeners: Array<(state: ConnectionState) => void> = [];
@@ -60,45 +52,25 @@ export function createDebateChannel(
 		}
 	}
 
-	function dispatchVote(event: VoteEvent) {
-		// The originating tab applies its own vote optimistically. Consume only
-		// the matching local echo; other tabs still receive the same vote event.
-		if (
-			localVoterId !== null &&
-			event.voterId === localVoterId &&
-			localVotesAwaitingEcho.delete(event.argumentId)
-		) {
-			return;
-		}
-		callbacks.onVote(event);
+	function flushPendingArgumentUpdate(argumentId: string) {
+		const arg = pendingArgumentUpdates.get(argumentId);
+		if (!arg) return;
+		pendingArgumentUpdates.delete(argumentId);
+		callbacks.onArgumentUpdate(arg);
 	}
 
-	function flushPendingVotes(argumentId: string) {
-		const votes = pendingVotes.get(argumentId);
-		if (!votes) return;
-		pendingVotes.delete(argumentId);
-		pendingVoteCount -= votes.length;
-		for (const vote of votes) dispatchVote(vote);
-	}
-
-	function rememberPendingVote(event: VoteEvent) {
-		const votes = pendingVotes.get(event.argumentId) ?? [];
-		votes.push(event);
-		pendingVotes.set(event.argumentId, votes);
-		pendingVoteCount += 1;
+	function rememberPendingArgumentUpdate(arg: Argument) {
+		pendingArgumentUpdates.set(arg.id, arg);
 
 		// Realtime has no replay for an event missed during subscription. Keep a
 		// bounded queue so an unknown/foreign stream cannot grow this channel
 		// without limit; entries are released when their argument is proven local.
-		while (pendingVoteCount > MAX_PENDING_VOTES) {
-			const oldest = pendingVotes.entries().next().value as
-				| [string, VoteEvent[]]
+		while (pendingArgumentUpdates.size > MAX_PENDING_ARGUMENT_UPDATES) {
+			const oldest = pendingArgumentUpdates.entries().next().value as
+				| [string, Argument]
 				| undefined;
 			if (!oldest) break;
-			const [oldestArgumentId, oldestVotes] = oldest;
-			oldestVotes.shift();
-			pendingVoteCount -= 1;
-			if (oldestVotes.length === 0) pendingVotes.delete(oldestArgumentId);
+			pendingArgumentUpdates.delete(oldest[0]);
 		}
 	}
 
@@ -110,13 +82,10 @@ export function createDebateChannel(
 			debateArgumentIds.add(argumentId);
 		}
 
-		// A refresh supplies authoritative scores, so buffered deltas for rows it
+		// A refresh supplies authoritative scores, so buffered updates for rows it
 		// knows about must not be replayed on top of those scores.
 		for (const argumentId of refreshedArgumentIds) {
-			const votes = pendingVotes.get(argumentId);
-			if (!votes) continue;
-			pendingVotes.delete(argumentId);
-			pendingVoteCount -= votes.length;
+			pendingArgumentUpdates.delete(argumentId);
 		}
 	}
 
@@ -146,48 +115,41 @@ export function createDebateChannel(
 				// check as a defense-in-depth boundary before admitting membership.
 				if (arg.debateId !== debateId) return;
 				// A realtime INSERT proves membership. Notify the consumer first so
-				// replayed votes are applied after the argument enters local state.
+				// replayed updates are applied after the argument enters local state.
 				debateArgumentIds.add(arg.id);
 				callbacks.onArgument(arg);
-				flushPendingVotes(arg.id);
+				flushPendingArgumentUpdate(arg.id);
 			},
 		)
 		.on(
 			"postgres_changes",
 			{
-				event: "INSERT",
+				event: "UPDATE",
 				schema: "public",
-				table: "votes",
+				table: "arguments",
+				filter: `debate_id=eq.${debateId}`,
 			},
 			(payload) => {
 				if (stopped) return;
 				lastEventAt = Date.now();
 				const row = payload.new as Record<string, unknown>;
-				const argumentId = row.argument_id;
-				const vote = row.vote;
-				const voterId = row.voter_id;
 				if (
-					typeof argumentId !== "string" ||
-					argumentId.length === 0 ||
-					(vote !== "strong" && vote !== "weak") ||
-					typeof voterId !== "string" ||
-					voterId.length === 0
+					typeof row.id !== "string" ||
+					row.id.length === 0 ||
+					row.debate_id !== debateId ||
+					typeof row.net_vote_score !== "number" ||
+					!Number.isFinite(row.net_vote_score)
 				) {
 					return;
 				}
-				const event: VoteEvent = {
-					argumentId,
-					vote,
-					voterId,
-				};
-				// Supabase realtime doesn't support filtering on a join column. Hold
-				// unknown IDs until a local argument INSERT or refresh proves membership;
-				// otherwise an event from another debate is never dispatched.
-				if (!debateArgumentIds.has(argumentId)) {
-					rememberPendingVote(event);
+				const arg = mapRowToArgument(row);
+				// UPDATE carries the authoritative net_vote_score from the database;
+				// never apply a vote delta on top of the optimistic/local score.
+				if (!debateArgumentIds.has(arg.id)) {
+					rememberPendingArgumentUpdate(arg);
 					return;
 				}
-				dispatchVote(event);
+				callbacks.onArgumentUpdate(arg);
 			},
 		);
 
@@ -219,22 +181,12 @@ export function createDebateChannel(
 				clearInterval(heartbeatTimer);
 				heartbeatTimer = null;
 			}
-			pendingVotes.clear();
-			pendingVoteCount = 0;
-			localVotesAwaitingEcho.clear();
+			pendingArgumentUpdates.clear();
 			supabase.removeChannel(channel);
 			setState("paused");
 		},
 
 		reconcileArgumentIds,
-
-		registerLocalVote(argumentId: string): void {
-			if (localVoterId !== null) localVotesAwaitingEcho.add(argumentId);
-		},
-
-		cancelLocalVote(argumentId: string): void {
-			localVotesAwaitingEcho.delete(argumentId);
-		},
 
 		getConnectionState(): ConnectionState {
 			return connectionState;

@@ -47,7 +47,7 @@ pnpm dev
 
 ## Architecture
 
-Argument nodes and votes are stored in Supabase Postgres with row-level security. Supabase Realtime pushes vote and new-argument events directly to the D3 visualization without polling. The crux-detection algorithm traverses the tree from both roots, computing weighted vote convergence at each depth level. The AI classifier runs as a Next.js route handler — streamed, so the type suggestion appears as you type.
+Argument nodes and votes are stored in Supabase Postgres with row-level security. Supabase Realtime pushes new arguments and authoritative argument score updates directly to the D3 visualization without polling. The crux-detection algorithm traverses the tree from both roots, computing weighted vote convergence at each depth level. The AI classifier runs as a Next.js route handler — streamed, so the type suggestion appears as you type.
 
 ## License
 

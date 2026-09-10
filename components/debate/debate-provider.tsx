@@ -102,7 +102,7 @@ export function DebateProvider({
 		}
 
 		// The channel owns the debate-membership filter. Keep the initial IDs in
-		// that shared filter so existing votes and future argument inserts follow
+		// that shared filter so existing arguments and future inserts/updates follow
 		// the same path; a provider-local snapshot would go stale after an insert.
 		const channel = createDebateChannel(
 			debate.id,
@@ -114,19 +114,21 @@ export function DebateProvider({
 						return [...prev, arg];
 					});
 				},
-				onVote: ({ argumentId, vote }) => {
-					const delta = vote === "strong" ? 1 : -1;
+				onArgumentUpdate: (arg) => {
 					setArgs((prev) =>
 						prev.map((a) =>
-							a.id === argumentId
-								? { ...a, netVoteScore: a.netVoteScore + delta }
+							a.id === arg.id
+								? {
+										...a,
+										netVoteScore: arg.netVoteScore,
+										flagCount: arg.flagCount,
+									}
 								: a,
 						),
 					);
 				},
 			},
 			new Set(argsRef.current.map((a) => a.id)),
-			currentUserId,
 		);
 		channelRef.current = channel;
 
@@ -208,7 +210,6 @@ export function DebateProvider({
 			const delta = vote === "strong" ? 1 : -1;
 			const nextVotes = new Set(userVotes);
 			nextVotes.add(argumentId);
-			channelRef.current?.registerLocalVote(argumentId);
 			setUserVotes(nextVotes);
 			saveUserVotes(debate.id, nextVotes);
 
@@ -228,7 +229,6 @@ export function DebateProvider({
 				});
 
 				if (!res.ok) {
-					channelRef.current?.cancelLocalVote(argumentId);
 					// Revert optimistic update
 					const reverted = new Set(userVotes);
 					setUserVotes(reverted);
@@ -242,11 +242,11 @@ export function DebateProvider({
 										netVoteScore: a.netVoteScore - delta,
 									}
 								: a,
-						),
+							),
 					);
+					await refreshDebate();
 				}
 			} catch {
-				channelRef.current?.cancelLocalVote(argumentId);
 				// Revert on network error
 				const reverted = new Set(userVotes);
 				setUserVotes(reverted);
@@ -259,9 +259,10 @@ export function DebateProvider({
 							: a,
 					),
 				);
+				await refreshDebate();
 			}
 		},
-		[debate.id, userVotes],
+		[debate.id, refreshDebate, userVotes],
 	);
 
 	return (
