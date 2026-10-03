@@ -40,6 +40,9 @@ pnpm dev
 Run commands from the repository root after the frozen-lockfile install above.
 `pnpm-workspace.yaml` controls effective dependency overrides; preserve it with
 the lockfile rather than assuming the duplicated `package.json` overrides win.
+Specifically, Vite resolves to 8.0.16 and PostCSS to 8.5.15, although
+`package.json` declares 8.3.1 and 8.5.28 respectively; the workspace overrides
+and lockfile agree on the effective versions.
 
 ```bash
 pnpm test lib/crux-finder.test.ts  # focused, deterministic algorithm tests
@@ -67,12 +70,16 @@ require browser or provider verification.
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 16 (App Router, Server Components) |
-| Language | TypeScript 6 |
-| Database + Auth | Supabase (Postgres + Realtime + RLS) |
-| Visualization | D3 v7 |
-| Animation | Framer Motion 13 |
-| Styling | Tailwind CSS 4 |
+| Framework | Next.js 16.3.6 (App Router, Server Components) |
+| Language | TypeScript 6.0.3 |
+| UI runtime | React / React DOM 19.3.0 |
+| Database + Auth | Supabase (Postgres + Realtime + RLS); @supabase/supabase-js 2.117.2, @supabase/ssr 0.12.7 |
+| Visualization | D3 7.9.0 |
+| Animation | Framer Motion 13.4.4 |
+| Styling | Tailwind CSS 4.3.3 |
+| AI client (optional at runtime) | @anthropic-ai/sdk 0.128.0 |
+| Tests | Vitest 4.1.11; Playwright 1.63.0 |
+| Lint | ESLint 9.39.4; eslint-config-next 16.3.6 |
 
 ## Architecture
 
