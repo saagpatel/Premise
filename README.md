@@ -18,7 +18,7 @@ Premise is an open-source structured debate platform. Two participants argue a c
 ## Quick Start
 
 ### Prerequisites
-- Node.js 22.12+ (CI uses Node 22)
+- Node.js 22.x (22.12+) or Node.js 24+ (CI uses Node 22)
 - pnpm 10.25.0, pinned by `package.json`
 - Supabase project (free tier works)
 - Anthropic API key (optional, for AI classifier)
