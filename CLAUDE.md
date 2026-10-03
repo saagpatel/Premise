@@ -1,27 +1,37 @@
 # Premise
 
-Structured debate platform where every argument is typed (evidence, analogy, counterexample, etc.) and linked to a parent claim. Live D3.js argument tree; spectators vote per node — not sides. Next.js 15 + Supabase (BYOS), deployed to Vercel, MIT licensed.
+Structured debate platform where every argument is typed (evidence, analogy, counterexample, etc.) and linked to a parent claim. Live D3.js argument tree; spectators vote per node — not sides. Next.js 16.3.6 + Supabase (BYOS), deployed to Vercel, MIT licensed.
 
 ## Stack
-- **Language:** TypeScript 5.4+ — strict mode, `unknown` + narrowing (no `any`)
-- **Framework:** Next.js 15.5+ (App Router, Server Actions)
+- **Language:** TypeScript 6.0.3 — strict mode, `unknown` + narrowing (no `any`)
+- **Framework:** Next.js 16.3.6 (App Router, Server Actions)
 - **Database:** Supabase (PostgreSQL) — Realtime, RLS, Auth
-- **Supabase Client:** @supabase/ssr 0.4+ — App Router-aware, cookie sessions
-- **Visualization:** D3.js 7.9+ — `d3.tree()` layout, zoom/pan, animated transitions
-- **Styling:** Tailwind CSS 3.4+
-- **Animation:** Framer Motion 11+ (UI transitions only; D3 owns tree animations)
-- **AI (optional):** @anthropic-ai/sdk 0.20+ — Haiku argument type classifier
+- **Supabase Client:** @supabase/ssr 0.12.7 — App Router-aware, cookie sessions
+- **Visualization:** D3.js 7.9.0 — `d3.tree()` layout, zoom/pan, animated transitions
+- **Styling:** Tailwind CSS 4.3.3
+- **Animation:** Framer Motion 13.4.4 (UI transitions only; D3 owns tree animations)
+- **AI (optional):** @anthropic-ai/sdk 0.128.0 — Haiku argument type classifier
 
 ## Build / Test / Run
+
+Use pnpm 10.25.0, pinned by `package.json`, with Node.js 22.12+ on the
+22.x line or Node.js 24+ (CI uses Node 22). Install with
+`pnpm install --frozen-lockfile`. Effective dependency overrides come from
+`pnpm-workspace.yaml`; see README.md for the manifest/lockfile differences.
 
 ```bash
 pnpm dev          # local dev server
 pnpm build        # production build
 pnpm lint         # ESLint
-npx tsc --noEmit  # type-check
-pnpm exec vitest run  # unit tests (Vitest — no "test" script in package.json)
-pnpm exec playwright test  # e2e tests
+pnpm type-check  # TypeScript 6.0.3; tsc --noEmit
+pnpm test        # unit tests (Vitest 4.1.11)
+pnpm exec playwright test  # Playwright 1.63.0; deployed-site e2e tests
 ```
+
+The default Playwright configuration targets the deployed site and bypasses
+CSP. Configure it for an approved local/test environment before executing tests;
+it does not start a local server. See README.md for verification guidance.
+CI runs `pnpm test`, `pnpm tsc --noEmit`, and `pnpm build`; lint is separate.
 
 ## Conventions
 - File names: kebab-case. Components: PascalCase.
@@ -61,7 +71,7 @@ pnpm exec playwright test  # e2e tests
 
 ## What This Project Is
 
-Premise is an open-source, structured debate platform where every argument must be categorized by type (evidence, analogy, counterexample, etc.) and linked to a specific parent claim. The result is a live D3.js argument tree where spectators vote on individual nodes — not sides. Built on Next.js 14 + Supabase (BYOS), deployed to Vercel, MIT licensed.
+Premise is an open-source, structured debate platform where every argument must be categorized by type (evidence, analogy, counterexample, etc.) and linked to a specific parent claim. The result is a live D3.js argument tree where spectators vote on individual nodes — not sides. Built on Next.js 16.3.6 + Supabase (BYOS), deployed to Vercel, MIT licensed.
 
 ## Current State
 
@@ -70,14 +80,14 @@ Foundation, core debate flow, real-time + voting, auth + discovery, and launch p
 
 ## Stack
 
-- Language: TypeScript 5.4+ — strict mode, no `any`
-- Framework: Next.js 14.2+ (App Router, Server Actions)
+- Language: TypeScript 6.0.3 — strict mode, no `any`
+- Framework: Next.js 16.3.6 (App Router, Server Actions)
 - Database: Supabase (PostgreSQL) — Realtime, RLS, Auth
-- Supabase Client: @supabase/ssr 0.4+ — App Router-aware, cookie sessions
-- Visualization: D3.js 7.9+ — `d3.tree()` layout, zoom/pan, animated transitions
-- Styling: Tailwind CSS 3.4+
-- Animation: Framer Motion 11+ (UI transitions only; D3 handles tree animations)
-- AI (optional): @anthropic-ai/sdk 0.20+ — Haiku argument type classifier
+- Supabase Client: @supabase/ssr 0.12.7 — App Router-aware, cookie sessions
+- Visualization: D3.js 7.9.0 — `d3.tree()` layout, zoom/pan, animated transitions
+- Styling: Tailwind CSS 4.3.3
+- Animation: Framer Motion 13.4.4 (UI transitions only; D3 handles tree animations)
+- AI (optional): @anthropic-ai/sdk 0.128.0 — Haiku argument type classifier
 
 ## How To Run
 
