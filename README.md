@@ -18,13 +18,14 @@ Premise is an open-source structured debate platform. Two participants argue a c
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 22.x (22.12+) or Node.js 24+ (CI uses Node 22)
+- pnpm 10.25.0, pinned by `package.json`
 - Supabase project (free tier works)
 - Anthropic API key (optional, for AI classifier)
 
 ### Installation
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 cp .env.example .env.local
 # Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
@@ -34,16 +35,44 @@ cp .env.example .env.local
 pnpm dev
 ```
 
+## Verification
+
+Run commands from the repository root after the frozen-lockfile install above.
+`pnpm-workspace.yaml` controls effective dependency overrides; preserve it with
+the lockfile rather than assuming the duplicated `package.json` overrides win.
+
+```bash
+pnpm test lib/crux-finder.test.ts  # focused, deterministic algorithm tests
+pnpm test                        # all Vitest tests; Supabase realtime is mocked
+pnpm type-check                  # TypeScript; CI invokes the equivalent tsc --noEmit
+pnpm lint                        # ESLint; separate from Next build, may report warnings
+pnpm build                       # production compilation; also run by CI
+```
+
+Unit tests need no Supabase project or AI credentials. Supabase settings are
+needed for interactive use; use an approved test project when exercising writes.
+There is no separately configured formatter check. CI's test/type/build lanes
+are defined in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+For changed UI behavior, run `pnpm dev` with that test configuration and inspect
+the local home/sign-in views and the changed debate tree/crux interaction in a
+separate browser profile. Do not submit data to a production Supabase project.
+The existing `playwright.config.ts` targets a **deployed** site and bypasses CSP;
+its default `pnpm exec playwright test` is not a local smoke or evidence that
+production CSP works. Retarget/configure a browser test explicitly for the
+approved local environment before using it. Pure documentation changes do not
+require browser or provider verification.
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 15 (App Router, Server Components) |
-| Language | TypeScript 5.9 |
+| Framework | Next.js 16 (App Router, Server Components) |
+| Language | TypeScript 6 |
 | Database + Auth | Supabase (Postgres + Realtime + RLS) |
 | Visualization | D3 v7 |
-| Animation | Framer Motion 11 |
-| Styling | Tailwind CSS 3 |
+| Animation | Framer Motion 13 |
+| Styling | Tailwind CSS 4 |
 
 ## Architecture
 
