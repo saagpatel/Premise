@@ -13,7 +13,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.128.0",
+    "@anthropic-ai/sdk": "0.131.0",
     "@sentry/nextjs": "10.70.0",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",
@@ -30,17 +30,17 @@
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/d3": "7.4.3",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "autoprefixer": "10.6.1",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "postcss": "8.5.28",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vite": "8.3.1",
+    "vite": "8.3.2",
     "vitest": "4.1.11"
   },
   "overrides": {
@@ -48,7 +48,7 @@
     "@opentelemetry/core": "2.8.0",
     "js-yaml": "5.2.0",
     "postcss": "8.5.28",
-    "vite": "8.3.1",
+    "vite": "8.3.2",
     "ws": "8.21.0"
   }
 }
